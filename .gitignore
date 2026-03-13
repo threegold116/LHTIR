@@ -1,0 +1,6 @@
+**/checkpoints/*
+**/logs/*
+**/wandb/*
+**/outputs/*
+**/rollout/*
+**/data/*
