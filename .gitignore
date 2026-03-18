@@ -3,4 +3,12 @@
 **/wandb/*
 **/outputs/*
 **/rollout/*
+**/result/*
+**/results/*
+**/*.lock
+**/*.log
+**/*.pyc
+**/score/*
 **/data/*
+**/.vscode/*
+**/upload.sh

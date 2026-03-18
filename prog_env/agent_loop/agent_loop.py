@@ -39,6 +39,11 @@ from verl.workers.rollout.async_server import async_server_class
 logger = logging.getLogger(__file__)
 logger.setLevel(os.getenv("VERL_LOGGING_LEVEL", "WARN"))
 
+#--------THREEGOLDCHANGE--------#
+'''
+1.在AgentLoopWorker.__init__()中增加name_id的获取
+'''
+#--------THREEGOLDCHANGE--------#
 
 class AsyncLLMServerManager:
     """
@@ -124,7 +129,12 @@ class AgentLoopOutput(BaseModel):
     """Number of chat turns, including user, assistant, tool."""
     metrics: AgentLoopMetrics
     """Auxiliary performance metrics"""
-
+    #--------THREEGOLDCHANGE--------#
+    '''
+    1.在AgentLoopOutput中增加codes的传入:follow MatchTIR
+    '''
+    codes: str = ""
+    #--------THREEGOLDCHANGE--------#
 
 # make hydra.utils.instantiate happy
 class _DummyConfig:
@@ -233,10 +243,13 @@ class AgentLoopWorker:
             trace_config.get("backend"),
             trace_config.get("token2text", False),
         )
-        #THREEGOLDCHANGE
+        #--------THREEGOLDCHANGE--------#
+        '''
+        1.在AgentLoopWorker.__init__()中增加name_id的获取:通过AgentLoopWorker的初始化options()中的name参数获取
+        '''
         import ray
         self.name_id = ray.get_runtime_context().get_actor_name()        
-        #THREEGOLDCHANGE
+        #--------THREEGOLDCHANGE--------#
 
     async def generate_sequences(self, batch: DataProto) -> DataProto:
         """Generate sequences from agent loop.
@@ -280,6 +293,16 @@ class AgentLoopWorker:
         tasks = []
         agent_names = batch.non_tensor_batch["agent_name"]
         raw_prompts = batch.non_tensor_batch["raw_prompt"]
+        #--------THREEGOLDCHANGE--------#
+        '''
+        2.在generate_sequences中增加codes/tools的传入:follow MatchTIR
+        - 获取batch中每个样本的codes/tools
+        - 传递至_run_agent_loop中
+        #TODO:通过sample_params设置max_step_length
+        '''
+        batch_codes = batch.non_tensor_batch["codes"]
+        batch_tools = batch.non_tensor_batch["tools"]
+        #--------THREEGOLDCHANGE--------#
         if "index" in batch.non_tensor_batch:
             index = batch.non_tensor_batch["index"]
         else:
@@ -289,21 +312,28 @@ class AgentLoopWorker:
             batch.meta_info.get("global_steps", -1), index, batch.meta_info.get("validate", False)
         )
 
-        for agent_name, messages, trajectory in zip(agent_names, raw_prompts, trajectory_info, strict=True):
+        for agent_name, messages, trajectory, tools, codes in zip(agent_names, raw_prompts, trajectory_info, batch_tools, batch_codes, strict=True):
             tasks.append(
-                asyncio.create_task(self._run_agent_loop(agent_name, messages.tolist(), sampling_params, trajectory))
+                asyncio.create_task(self._run_agent_loop(agent_name, messages.tolist(), sampling_params, trajectory, tools=tools, codes=codes))
             )
         outputs = await asyncio.gather(*tasks)
 
         output = self._postprocess(outputs)
         return output
-
+    #--------THREEGOLDCHANGE--------#
+    '''
+    3.在_run_agent_loop中增加tools/codes的传入:follow MatchTIR
+    '''
+    #--------THREEGOLDCHANGE--------#
     async def _run_agent_loop(
         self,
         agent_name: str,
         messages: list[dict[str, Any]],
         sampling_params: dict[str, Any],
         trajectory: dict[str, Any],
+        tools: list[dict[str, Any]],
+        codes: list[dict[str, Any]],
+        #--------THREEGOLDCHANGE--------#
     ) -> AgentLoopOutput:
         with rollout_trace_attr(
             step=trajectory["step"],
@@ -323,9 +353,18 @@ class AgentLoopWorker:
                 server_manager=self.server_manager,
                 tokenizer=self.tokenizer,
             )
-            output = await agent_loop.run(messages, sampling_params)
+            #--------THREEGOLDCHANGE--------#
+            '''
+            4.在_run_agent_loop中增加tools/codes的传入:follow MatchTIR
+            '''
+            output = await agent_loop.run(messages, sampling_params, tools, codes)
+            #--------THREEGOLDCHANGE--------#
             return output
-
+    #--------THREEGOLDCHANGE--------#
+    '''
+    5.在_postprocess中增加codes的传入:follow MatchTIR
+    '''
+    #--------THREEGOLDCHANGE--------#
     def _postprocess(self, inputs: list[AgentLoopOutput]) -> DataProto:
         # NOTE: consistent with batch version of generate_sequences in vllm_rollout_spmd.py
         # prompts: left pad
@@ -333,7 +372,7 @@ class AgentLoopWorker:
         # input_ids: prompt + response
         # attention_mask: [0,0,0,0,1,1,1,1, | 1,1,1,0,0,0,0,0]
         # position_ids:   [0,0,0,0,0,1,2,3, | 4,5,6,7,8,9,10,11]
-
+        #FIXME:padding到最大长度合理吗？
         # prompts
         self.tokenizer.padding_side = "left"
         outputs = self.tokenizer.pad(
@@ -388,7 +427,13 @@ class AgentLoopWorker:
 
         num_turns = np.array([input.num_turns for input in inputs], dtype=np.int32)
         metrics = [input.metrics.model_dump() for input in inputs]
-        return DataProto(batch=batch, non_tensor_batch={"__num_turns__": num_turns}, meta_info={"metrics": metrics})
+        #--------THREEGOLDCHANGE--------#
+        '''
+        6.在_postprocess中增加codes的传入:follow MatchTIR
+        '''
+        #--------THREEGOLDCHANGE--------#
+        codes = np.array([input.codes for input in inputs], dtype=object)
+        return DataProto(batch=batch, non_tensor_batch={"__num_turns__": num_turns, "codes": codes}, meta_info={"metrics": metrics})
 
 
 async def get_trajectory_info(step, index, validate):

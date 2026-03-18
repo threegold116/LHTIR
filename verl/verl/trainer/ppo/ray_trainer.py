@@ -63,6 +63,14 @@ from verl.utils.tracking import ValidationGenerationsLogger
 
 WorkerType = type[Worker]
 
+#--------THREEGOLDCHANGE--------#
+'''对RayPPOTrainer的修改
+1. __init_workers__中支持自定义agent_loop manager，通过custom_cls.path(pkg://或file://)和custom_cls.name指定
+2. batch中增加tools/codes的传入
+3. __init__中支持自定义advantage estimator
+'''
+
+#--------THREEGOLDCHANGE--------#
 
 class Role(Enum):
     """
@@ -382,8 +390,15 @@ class RayPPOTrainer:
             AdvantageEstimator.GPG,
         ]:
             self.use_critic = False
+        #--------THREEGOLDCHANGE--------#
+        #1.增加对自定义advantage estimator的支持
         else:
-            raise NotImplementedError
+            import prog_env.advantage_est #注册自定义advantage estimator
+            if self.config.algorithm.adv_estimator in core_algos.ADV_ESTIMATOR_REGISTRY:
+                self.use_critic = False
+            else:
+                raise NotImplementedError(f"Advantage estimator {self.config.algorithm.adv_estimator} not found")
+        #--------THREEGOLDCHANGE--------#
 
         self._validate_config()
         self._create_dataloader(train_dataset, val_dataset, collate_fn, train_sampler)
@@ -720,6 +735,15 @@ class RayPPOTrainer:
                 non_tensor_batch_keys_to_pop.append("interaction_kwargs")
             if "agent_name" in test_batch.non_tensor_batch:
                 non_tensor_batch_keys_to_pop.append("agent_name")
+            #--------THREEGOLDCHANGE--------#
+            '''
+            1.validation阶段新增codes和tools的传入:follow MatchTIR
+            '''
+            if "codes" in test_batch.non_tensor_batch:
+                non_tensor_batch_keys_to_pop.append("codes")
+            if "tools" in test_batch.non_tensor_batch:
+                non_tensor_batch_keys_to_pop.append("tools")
+            #--------THREEGOLDCHANGE--------#
             test_gen_batch = test_batch.pop(
                 batch_keys=batch_keys_to_pop,
                 non_tensor_batch_keys=non_tensor_batch_keys_to_pop,
@@ -919,8 +943,16 @@ class RayPPOTrainer:
         # create async rollout manager and request scheduler
         self.async_rollout_mode = False
         if self.config.actor_rollout_ref.rollout.mode == "async":
-            from verl.experimental.agent_loop import AgentLoopManager
-
+            #--------THREEGOLDCHANGE--------#
+            '''
+            1.支持自定义agent_loop manager，通过custom_cls.path(pkg://或file://)和custom_cls.name指定
+            '''
+            if "custom_cls" in self.config.actor_rollout_ref.rollout and self.config.actor_rollout_ref.rollout.custom_cls.get("path", None) is not None:
+                from verl.utils.import_utils import load_extern_type
+                AgentLoopManager = load_extern_type(self.config.actor_rollout_ref.rollout.custom_cls.path, self.config.actor_rollout_ref.rollout.custom_cls.name)
+            else:
+                from verl.experimental.agent_loop import AgentLoopManager            
+            #--------THREEGOLDCHANGE--------#
             self.async_rollout_mode = True
             self.async_rollout_manager = AgentLoopManager(
                 config=self.config,
@@ -1121,8 +1153,6 @@ class RayPPOTrainer:
         self.global_steps += 1
         last_val_metrics = None
         self.max_steps_duration = 0
-        if "1" in os.environ.get("RAY_DEBUG_MODE", "0"):
-            breakpoint()
         for epoch in range(self.config.trainer.total_epochs):
             for batch_dict in self.train_dataloader:
                 metrics = {}
@@ -1153,12 +1183,19 @@ class RayPPOTrainer:
                     non_tensor_batch_keys_to_pop.append("index")
                 if "agent_name" in batch.non_tensor_batch:
                     non_tensor_batch_keys_to_pop.append("agent_name")
-
+                #--------THREEGOLDCHANGE--------#
+                '''
+                2. batch中增加tools/codes的传入:follow MatchTIR
+                '''
+                if "tools" in batch.non_tensor_batch:
+                    non_tensor_batch_keys_to_pop.append("tools")
+                if "codes" in batch.non_tensor_batch:
+                    non_tensor_batch_keys_to_pop.append("codes")
+                #--------THREEGOLDCHANGE--------#
                 gen_batch = batch.pop(
                     batch_keys=batch_keys_to_pop,
                     non_tensor_batch_keys=non_tensor_batch_keys_to_pop,
                 )
-
                 # pass global_steps to trace
                 gen_batch.meta_info["global_steps"] = self.global_steps
                 gen_batch = gen_batch.repeat(repeat_times=self.config.actor_rollout_ref.rollout.n, interleave=True)
@@ -1169,7 +1206,7 @@ class RayPPOTrainer:
                     # generate a batch
                     with marked_timer("gen", timing_raw, color="red"):
                         if not self.async_rollout_mode:
-                            gen_batch_output = self.actor_rollout_wg.generate_sequences(gen_batch)
+                            gen_batch_output = self.actor_rollout_wg.generate_sequences(gen_batch_output)
                         else:
                             gen_batch_output = self.async_rollout_manager.generate_sequences(gen_batch)
                         timing_raw.update(gen_batch_output.meta_info["timing"])
@@ -1214,7 +1251,8 @@ class RayPPOTrainer:
 
                     # compute global_valid tokens
                     batch.meta_info["global_token_num"] = torch.sum(batch.batch["attention_mask"], dim=-1).tolist()
-
+                    if "1" in os.environ.get("RAY_DEBUG_MODE", "0"):
+                        breakpoint()
                     with marked_timer("reward", timing_raw, color="yellow"):
                         # compute reward model score
                         if self.use_rm:
@@ -1332,8 +1370,17 @@ class RayPPOTrainer:
                     rollout_data_dir = self.config.trainer.get("rollout_data_dir", None)
                     if rollout_data_dir:
                         with marked_timer("dump_rollout_generations", timing_raw, color="green"):
-                            inputs = self.tokenizer.batch_decode(batch.batch["prompts"], skip_special_tokens=True)
-                            outputs = self.tokenizer.batch_decode(batch.batch["responses"], skip_special_tokens=True)
+                            #--------THREEGOLDCHANGE--------#
+                            '''
+                            1. 保存specail_tokens:同时去除pad_token
+                            '''
+                            # inputs = self.tokenizer.batch_decode(batch.batch["prompts"], skip_special_tokens=True)
+                            inputs = self.tokenizer.batch_decode(batch.batch["prompts"], skip_special_tokens=False)
+                            inputs = [input.replace(self.tokenizer.pad_token, "") for input in inputs]
+                            # outputs = self.tokenizer.batch_decode(batch.batch["responses"], skip_special_tokens=True)
+                            outputs = self.tokenizer.batch_decode(batch.batch["responses"], skip_special_tokens=False)
+                            outputs = [output.replace(self.tokenizer.pad_token, "") for output in outputs]
+                            #--------THREEGOLDCHANGE--------#
                             scores = batch.batch["token_level_scores"].sum(-1).cpu().tolist()
                             if "request_id" in batch.non_tensor_batch:
                                 reward_extra_infos_dict.setdefault(
