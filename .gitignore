@@ -11,7 +11,9 @@
 **/score/*
 **/data/*
 !verl/verl/trainer/config/rollout/*
+!verl/verl/workers/rollout/*
 !verl/verl/trainer/config/data/*
+!verl/verl/workers/data/*
 **/.vscode/*
 **/upload.sh
 **/*.sh
