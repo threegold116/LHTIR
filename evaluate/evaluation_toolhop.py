@@ -385,7 +385,8 @@ def parse_arguments():
     parser.add_argument("--end_id", type=int, default=-1)
 
     args = parser.parse_args()
-
+    print(f"args: {args}")
+    logger.info(f"args: {args}")
     return args
 
 

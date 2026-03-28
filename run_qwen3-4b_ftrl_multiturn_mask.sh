@@ -14,7 +14,7 @@ export LD_LIBRARY_PATH=/share/home/sxjiang/miniconda3/envs/envtuning/lib/python3
 export RAY_DEBUG_POST_MORTEM=1
 export NCCL_IB_TIMEOUT=22
 export NCCL_TIMEOUT=9999999999
-export CUDA_VISIBLE_DEVICES=0,1,2,3
+export CUDA_VISIBLE_DEVICES=0,1,2,3,4,5,6,7
 PROJECT_DIR="$(pwd)"
 CONFIG_PATH="$PROJECT_DIR/prog_env/config"
 
@@ -23,12 +23,12 @@ now() {
 }
 TIMESTAMP=$(now)
 PROJECT_NAME="qwen3-4b_ftrl_multiturn"
-EXPERIMENT_NAME="qwen3-4b-instruct-2507_ftrl_multiturn-no_kl_no_ent-mask_func"
+EXPERIMENT_NAME="qwen3-4b_ftrl_multiturn-no_kl_no_ent-n_8-no_kl_no_ent-mask_func-test-speed"
 ROLLOUT_DIR="$PROJECT_DIR/rollout/$PROJECT_NAME/$EXPERIMENT_NAME"
 DEFAULT_LOCAL_DIR="$PROJECT_DIR/checkpoints/$PROJECT_NAME/$EXPERIMENT_NAME"
 mkdir -p "$DEFAULT_LOCAL_DIR"
 LOG_FILE="$DEFAULT_LOCAL_DIR/$TIMESTAMP.log"
-MODEL="/share/home/sxjiang/model/Qwen3-4B-Instruct-2507"
+MODEL="/share/home/sxjiang/model/Qwen3-4B"
 
 python3 -m verl.trainer.main_ppo \
     --config-path="$CONFIG_PATH" \
@@ -51,7 +51,7 @@ python3 -m verl.trainer.main_ppo \
     actor_rollout_ref.actor.use_dynamic_bsz=True \
     actor_rollout_ref.actor.ppo_mini_batch_size=32 \
     actor_rollout_ref.actor.ppo_max_token_len_per_gpu=30000 \
-    actor_rollout_ref.actor.use_kl_loss=True \
+    actor_rollout_ref.actor.use_kl_loss=False \
     actor_rollout_ref.actor.kl_loss_coef=0 \
     actor_rollout_ref.actor.kl_loss_type=low_var_kl \
     actor_rollout_ref.actor.entropy_coeff=0 \
@@ -66,7 +66,7 @@ python3 -m verl.trainer.main_ppo \
     actor_rollout_ref.rollout.multi_turn.max_parallel_calls=10 \
     +actor_rollout_ref.rollout.custom_cls.path=pkg://prog_env.agent_loop \
     +actor_rollout_ref.rollout.custom_cls.name=AgentLoopManager \
-    actor_rollout_ref.rollout.gpu_memory_utilization=0.75 \
+    actor_rollout_ref.rollout.gpu_memory_utilization=0.8 \
     actor_rollout_ref.rollout.n=8 \
     actor_rollout_ref.ref.fsdp_config.param_offload=True \
     algorithm.use_kl_in_reward=False \
@@ -74,7 +74,7 @@ python3 -m verl.trainer.main_ppo \
     trainer.logger='["console","wandb"]' \
     trainer.project_name=$PROJECT_NAME \
     trainer.experiment_name=$EXPERIMENT_NAME \
-    trainer.n_gpus_per_node=4 \
+    trainer.n_gpus_per_node=8 \
     trainer.nnodes=1 \
     trainer.save_freq=8 \
     trainer.test_freq=4 \

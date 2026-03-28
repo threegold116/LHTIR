@@ -178,8 +178,12 @@ class ToolAgentLoop(AgentLoopBase):
         request_id = uuid4().hex
         #--------THREEGOLDCHANGE--------#
         '''
-        1.tools从instance中获取
+        1.tools从instance中获取:原始是通过tool_config_path获取的的tool_schemas,现在是直接通过data中的tools获取的
+        2.新增step_length统计和控制
+        3.新增时间统计
         '''
+        import time
+        t1 = time.time()
         prompt_ids = await self.loop.run_in_executor(
             None,
             # lambda: self.tokenizer.apply_chat_template(
@@ -187,10 +191,13 @@ class ToolAgentLoop(AgentLoopBase):
             # ),
             lambda: self.tokenizer.apply_chat_template(
                 messages, tools=tools, add_generation_prompt=True, tokenize=True
-            ),#TODO:加上enable_thinking的逻辑
+            ),#TODO:加上enable_thinking的逻辑,默认就是添加的
         )
         instance_id += 1
         logger.error(f"request_id: {request_id}, instance_id: {instance_id}")
+        local_instance_id = instance_id
+        step_length_list = []   
+        cost_time_list = []
         #--------THREEGOLDCHANGE--------#
         response_mask = []
         user_turns, assistant_turns = 0, 0
@@ -203,7 +210,8 @@ class ToolAgentLoop(AgentLoopBase):
                 - 因为self.config.max_model_len = self.config.prompt_length + self.config.response_length而prompt_length和response_length都是模型最大长度的约束(即max_model_len是prompt_length和response_length的约束)
             '''
             max_new_tokens = min(self.max_step_length, self.response_length-len(response_mask))
-            sampling_params["max_new_tokens"] = max_new_tokens
+            sampling_params["max_new_tokens"] = max_new_tokens  
+            t2 = time.time()
             #--------THREEGOLDCHANGE--------#
             with simple_timer("generate_sequences", metrics):
                 response_ids = await self.server_manager.generate(
@@ -211,6 +219,15 @@ class ToolAgentLoop(AgentLoopBase):
                 )
             prompt_ids += response_ids
             response_mask += [1] * len(response_ids)
+            
+            #--------THREEGOLDCHANGE--------#
+            '''
+            3.新增step_length统计和控制
+            '''
+            step_length_list.append(len(response_ids))
+            cost_time_list.append(time.time() - t2)
+            logger.error(f"running instance_id: {local_instance_id}, step_length: {len(response_ids)}, assistant_turns: {assistant_turns}, cost_time: {time.time() - t2}")
+            #--------THREEGOLDCHANGE--------#
             assistant_turns += 1
 
             # reach max response length
@@ -256,7 +273,12 @@ class ToolAgentLoop(AgentLoopBase):
             prompt_ids += tool_response_ids
             response_mask += [0] * len(tool_response_ids)
             user_turns += 1
-
+        #--------THREEGOLDCHANGE--------#
+        '''
+        4.新增打印部分:logger.error打印cost_time
+        '''
+        logger.error(f"instance_id finished: {local_instance_id}, response_length: {len(response_mask)}, assistant_turns: {assistant_turns}, step_length_list: {step_length_list}, cost_time_list: {cost_time_list}, total_cost_time: {time.time() - t1}")
+        #--------THREEGOLDCHANGE--------#
         response_ids = prompt_ids[-len(response_mask) :] #裁剪prompt_ids得到response_ids
         prompt_ids = prompt_ids[: len(prompt_ids) - len(response_mask)] #裁剪response_ids得到prompt_ids
 
@@ -270,7 +292,7 @@ class ToolAgentLoop(AgentLoopBase):
         )
         return output
 
-    async def _call_tool(self, tool_call: FunctionCall, codes: list[dict[str, Any]]) -> dict[str, str]:
+    async def _call_tool(self, tool_call: FunctionCall, codes: list[dict[str, Any]]=None) -> dict[str, str]:
         """Call tool and return tool response."""
         tool, instance_id = None, None
         try:
@@ -279,13 +301,15 @@ class ToolAgentLoop(AgentLoopBase):
             '''
             基于get_feedback函数模拟执行tool:被注释的是原agentloop实现
             '''
-            # tool_name = tool_call.name
-            # tool_args = json.loads(tool_call.arguments)
-            # tool = self.tools[tool_name]
+            if codes is None:
+                tool_name = tool_call.name
+                tool_args = json.loads(tool_call.arguments)
+                tool = self.tools[tool_name]
 
-            # instance_id = await tool.create()
-            # tool_response, _, _ = await tool.execute(instance_id, tool_args)
-            tool_response = get_feedback([tool_call], codes)[0]["content"]
+                instance_id = await tool.create()
+                tool_response, _, _ = await tool.execute(instance_id, tool_args)
+            else:
+                tool_response = get_feedback([tool_call], codes)[0]["content"]
             
             #--------THREEGOLDCHANGE--------#
         except Exception as e:

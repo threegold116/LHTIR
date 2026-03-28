@@ -5,7 +5,7 @@ conda activate verl_5_2
 
 export PROJECT_DIR="$(pwd)"
 export PYTHONPATH=$PROJECT_DIR:$PROJECT_DIR/verl:$PYTHONPATH
-export CUDA_VISIBLE_DEVICES=0,1,2,3
+export CUDA_VISIBLE_DEVICES=4,5,6,7
 set -e  # 有错误立即退出
 
 LOG_DIR="$PROJECT_DIR/logs/vllm_logs"
@@ -81,10 +81,11 @@ trap cleanup INT TERM EXIT # 移除了 EXIT，因为正常结束我们手动杀
 
 evaluation_file="evaluation_toolhop.py"
 file="toolhop/ToolHop.jsonl"
-model="/share/home/sxjiang/myproject/LHTIR/checkpoints/merged_checkpoints/qwen3-4b_ftrl_multiturn-no_kl_no_ent-MATCHTIR_KM-24"
+model="/share/home/sxjiang/myproject/LHTIR/checkpoints/merged_checkpoints/qwen3-4b-ftrl_multiturn-no_kl_no_ent-n_16-MATCHTIR_KM-24"
 vllm_run $model
 for scenario in "Free" "Direct" "Mandatory"; do
-    save_file="$PROJECT_DIR/results/ToolHop/Qwen3-4B/MatchTIR-KM-no_kl_no_ent-24-${scenario}-vllm.jsonl"
+    save_file="$PROJECT_DIR/results/ToolHop/Qwen3-4B/MatchTIR-KM-24-no_kl_no_ent-n_16-${scenario}-vllm-4096.jsonl"
+    LOG_FILE="$PROJECT_DIR/results/ToolHop/Qwen3-4B/eval_toolhop_vllm_${CURRENT_TIME}_${scenario}-MatchTIR-KM-24-no_kl_no_ent-n_16-4096.log"
     python3 $PROJECT_DIR/evaluate/${evaluation_file} \
         --scenario ${scenario} \
         --series qwen \
@@ -95,40 +96,14 @@ for scenario in "Free" "Direct" "Mandatory"; do
         --base_url http://localhost:7899/v1 \
         --concurrency 128 \
         --batch_size 1024 \
-        --max_tokens 2048 \
+        --max_tokens 4096 \
         --batch_mode async \
         --engine remote \
         --start_id 0 \
-        --end_id -1 
+        --end_id -1  2>&1 | tee  $LOG_FILE 
 done
 
 vllm_kill
 
-
-
-evaluation_file="evaluation_toolhop.py"
-file="toolhop/ToolHop.jsonl"
-model="/share/home/sxjiang/myproject/LHTIR/checkpoints/merged_checkpoints/qwen3-4b-instruct-2507_ftrl_multiturn-no_kl_no_ent-mask_func-MATCHTIR_KM-24"
-vllm_run $model
-for scenario in "Free" "Direct" "Mandatory"; do
-    save_file="$PROJECT_DIR/results/ToolHop/Qwen3-4B/MatchTIR-KM-instruct-2507-no_kl_no_ent-mask_func-24-${scenario}-vllm.jsonl"
-    python3 $PROJECT_DIR/evaluate/${evaluation_file} \
-        --scenario ${scenario} \
-        --series qwen \
-        --model_path ${model} \
-        --input_file $PROJECT_DIR/data/${file} \
-        --output_file ${save_file} \
-        --enable_thinking \
-        --base_url http://localhost:7899/v1 \
-        --concurrency 128 \
-        --batch_size 1024 \
-        --max_tokens 2048 \
-        --batch_mode async \
-        --engine remote \
-        --start_id 0 \
-        --end_id -1 
-done
-
-vllm_kill
 
 exit 0

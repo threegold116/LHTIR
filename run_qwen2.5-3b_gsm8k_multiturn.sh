@@ -6,10 +6,10 @@ conda activate verl_5_2
 set -x
 
 ulimit -n 65535
-
 export WANDB_MODE=offline
 export TRITON_CACHE_DIR="/tmp/triton_cache_$(whoami)"
-export RAY_DEBUG_MODE="3"
+export TORCHINDUCTOR_CACHE_DIR="/tmp/torchinductor_cache_$(whoami)"
+export RAY_DEBUG_MODE="0"
 export PYTHONPATH="$PROJECT_DIR:$PROJECT_DIR/verl:$PYTHONPATH"
 export LD_LIBRARY_PATH=/share/home/sxjiang/miniconda3/envs/envtuning/lib/python3.10/site-packages/nvidia/nvjitlink/lib:$LD_LIBRARY_PATH
 export RAY_DEBUG_POST_MORTEM=1

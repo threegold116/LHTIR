@@ -6,7 +6,7 @@ source /share/home/sxjiang/miniconda3/bin/activate
 export LOCAL_SERVER_ENDPOINT=localhost        # 可省略，默认就是 localhost
 export LOCAL_SERVER_PORT=7897                # 可省略，默认就是 1053
 export REMOTE_OPENAI_BASE_URL=http://0.0.0.0:7897/v1
-export CUDA_VISIBLE_DEVICES=4,5,6,7
+export CUDA_VISIBLE_DEVICES=0,1,2,3
 
 PROJECT_DIR="/share/home/sxjiang/myproject/LHTIR"
 LOG_DIR="$PROJECT_DIR/logs/vllm_logs"
@@ -84,12 +84,12 @@ trap cleanup INT TERM EXIT # 移除了 EXIT，因为正常结束我们手动杀
 
 
 
-MODEL_PATH="/share/home/sxjiang/myproject/LHTIR/checkpoints/merged_checkpoints/qwen3-4b-instruct-2507_ftrl_multiturn-no_kl_no_ent-n_8-MATCHTIR_KM-24"
-# MODEL_PATH="/share/home/sxjiang/model/Qwen3-4B-MatchTIR-KM"
+# MODEL_PATH="/share/home/sxjiang/myproject/LHTIR/checkpoints/merged_checkpoints/qwen3-4b-instruct-2507_ftrl_multiturn-no_kl_no_ent-n_8-mask_func-MATCHTIR_KM-24"
+MODEL_PATH="/share/home/sxjiang/myproject/LHTIR/checkpoints/merged_checkpoints/qwen3-4b-ftrl_multiturn-no_kl_no_ent-n_16-MATCHTIR_KM-24"
 export REMOTE_OPENAI_TOKENIZER_PATH=$MODEL_PATH
 MODEL_NAME="Qwen/Qwen3-4B-FC"
 TEST_CATEGORY="multi_turn"
-RESULT_DIR="$PROJECT_DIR/results/BFCL/Qwen3-4B/MatchTIR-KM-24-instruct-2507-ppo_32-no_kl_no_ent-n_8-vllm_fc"
+RESULT_DIR="$PROJECT_DIR/results/BFCL/Qwen3-4B/MatchTIR-KM-24-no_kl_no_ent-n_16-vllm_fc"
 vllm_run $MODEL_PATH
 conda activate BFCL
 
@@ -118,6 +118,5 @@ bfcl evaluate \
 
 vllm_kill
 
-
-
+exit 0
 

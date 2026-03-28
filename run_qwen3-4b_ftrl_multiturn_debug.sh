@@ -8,13 +8,14 @@ set -x
 ulimit -n 65535
 export WANDB_MODE=offline
 export TRITON_CACHE_DIR="/tmp/triton_cache_$(whoami)"
-export RAY_DEBUG_MODE="1"
+export TORCHINDUCTOR_CACHE_DIR="/tmp/torchinductor_cache_$(whoami)"
+export RAY_DEBUG_MODE="0"
 export PYTHONPATH="$PROJECT_DIR:$PROJECT_DIR/verl:$PYTHONPATH"
 export LD_LIBRARY_PATH=/share/home/sxjiang/miniconda3/envs/envtuning/lib/python3.10/site-packages/nvidia/nvjitlink/lib:$LD_LIBRARY_PATH
 export RAY_DEBUG_POST_MORTEM=1
 export NCCL_IB_TIMEOUT=22
 export NCCL_TIMEOUT=9999999999
-export CUDA_VISIBLE_DEVICES=0,1,2,3
+export CUDA_VISIBLE_DEVICES=0,1,2,3,4,5,6,7
 PROJECT_DIR="$(pwd)"
 CONFIG_PATH="$PROJECT_DIR/prog_env/config"
 
@@ -23,7 +24,7 @@ now() {
 }
 TIMESTAMP=$(now)
 PROJECT_NAME="qwen3-4b_ftrl_multiturn"
-EXPERIMENT_NAME="qwen3-4b_ftrl_multiturn-no_kl_no_ent"
+EXPERIMENT_NAME="qwen3-4b_ftrl_multiturn-no_kl_no_ent-n_16-origin_speed_test-agent_loop_8-bz_256-rollout_16-use_fused_kernels-ppo_60000"
 ROLLOUT_DIR="$PROJECT_DIR/rollout/$PROJECT_NAME/$EXPERIMENT_NAME"
 DEFAULT_LOCAL_DIR="$PROJECT_DIR/checkpoints/$PROJECT_NAME/$EXPERIMENT_NAME"
 mkdir -p "$DEFAULT_LOCAL_DIR"
@@ -34,9 +35,9 @@ python3 -m verl.trainer.main_ppo \
     --config-path="$CONFIG_PATH" \
     --config-name='ftrl_multiturn' \
     hydra.run.dir=$DEFAULT_LOCAL_DIR/output/${TIMESTAMP} \
-    algorithm.adv_estimator=mathtir \
-    data.train_batch_size=8 \
-    data.val_batch_size=8 \
+    algorithm.adv_estimator=mathtir_fast \
+    data.train_batch_size=256 \
+    data.val_batch_size=256 \
     data.max_prompt_length=7000 \
     data.max_response_length=23000 \
     data.prompt_key=messages\
@@ -48,10 +49,12 @@ python3 -m verl.trainer.main_ppo \
     actor_rollout_ref.model.path=$MODEL \
     actor_rollout_ref.actor.optim.lr=1e-6 \
     actor_rollout_ref.model.use_remove_padding=True \
+    actor_rollout_ref.model.use_fused_kernels=True \
+    actor_rollout_ref.model.use_liger=False \
     actor_rollout_ref.actor.use_dynamic_bsz=True \
-    actor_rollout_ref.actor.ppo_mini_batch_size=8 \
-    actor_rollout_ref.actor.ppo_max_token_len_per_gpu=30000 \
-    actor_rollout_ref.actor.use_kl_loss=True \
+    actor_rollout_ref.actor.ppo_mini_batch_size=32 \
+    actor_rollout_ref.actor.ppo_max_token_len_per_gpu=60000 \
+    actor_rollout_ref.actor.use_kl_loss=False \
     actor_rollout_ref.actor.kl_loss_coef=0 \
     actor_rollout_ref.actor.kl_loss_type=low_var_kl \
     actor_rollout_ref.actor.entropy_coeff=0 \
@@ -67,14 +70,14 @@ python3 -m verl.trainer.main_ppo \
     +actor_rollout_ref.rollout.custom_cls.path=pkg://prog_env.agent_loop \
     +actor_rollout_ref.rollout.custom_cls.name=AgentLoopManager \
     actor_rollout_ref.rollout.gpu_memory_utilization=0.75 \
-    actor_rollout_ref.rollout.n=8 \
+    actor_rollout_ref.rollout.n=16 \
     actor_rollout_ref.ref.fsdp_config.param_offload=True \
     algorithm.use_kl_in_reward=False \
     trainer.critic_warmup=0 \
     trainer.logger='["console","wandb"]' \
     trainer.project_name=$PROJECT_NAME \
     trainer.experiment_name=$EXPERIMENT_NAME \
-    trainer.n_gpus_per_node=4 \
+    trainer.n_gpus_per_node=8 \
     trainer.nnodes=1 \
     trainer.save_freq=8 \
     trainer.test_freq=4 \
