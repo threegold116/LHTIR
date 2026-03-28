@@ -13,3 +13,5 @@
 **/.vscode/*
 **/upload.sh
 **/*.sh
+**/*.whl
+**/*.whl.1
