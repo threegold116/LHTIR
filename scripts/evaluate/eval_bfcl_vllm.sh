@@ -6,7 +6,7 @@ source /share/home/sxjiang/miniconda3/bin/activate
 export LOCAL_SERVER_ENDPOINT=localhost        # 可省略，默认就是 localhost
 export LOCAL_SERVER_PORT=7897                # 可省略，默认就是 1053
 export REMOTE_OPENAI_BASE_URL=http://0.0.0.0:7897/v1
-export CUDA_VISIBLE_DEVICES=0,1,2,3
+export CUDA_VISIBLE_DEVICES=0,1,2,3,4,5,6,7
 
 PROJECT_DIR="/share/home/sxjiang/myproject/LHTIR"
 LOG_DIR="$PROJECT_DIR/logs/vllm_logs"

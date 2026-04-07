@@ -432,6 +432,10 @@ class DataParallelPPOActor(BasePPOActor):
                         )
 
                     else:
+                        #------THREEGOLDCHANGE--------#
+                        '''
+                        传入entropy，用于计算熵自适应的clip范围
+                        '''
                         policy_loss_fn = get_policy_loss_fn(loss_mode)
                         pg_loss, pg_clipfrac, ppo_kl, pg_clipfrac_lower = policy_loss_fn(
                             old_log_prob=old_log_prob,
@@ -439,8 +443,10 @@ class DataParallelPPOActor(BasePPOActor):
                             advantages=advantages,
                             response_mask=response_mask,
                             loss_agg_mode=loss_agg_mode,
+                            entropy=entropy,
                             config=self.config,
                         )
+                        #------THREEGOLDCHANGE--------#
 
                     if entropy_coeff != 0:
                         entropy_loss = agg_loss(loss_mat=entropy, loss_mask=response_mask, loss_agg_mode=loss_agg_mode)

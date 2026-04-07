@@ -62,9 +62,21 @@ def get_policy_loss_fn(name):
     """
     loss_name = name
     if loss_name not in POLICY_LOSS_REGISTRY:
-        raise ValueError(
-            f"Unsupported loss mode: {loss_name}. Supported modes are: {list(POLICY_LOSS_REGISTRY.keys())}"
-        )
+        #------THREEGOLDCHANGE--------#
+        '''
+        1. 支持自定义的policy loss:利用import时自动注册的特性
+        '''
+        import prog_env.loss_cal
+        if loss_name in POLICY_LOSS_REGISTRY:
+            return POLICY_LOSS_REGISTRY[loss_name]
+        else:
+            raise ValueError(
+                f"Unsupported loss mode: {loss_name}. Supported modes are: {list(POLICY_LOSS_REGISTRY.keys())}"
+            )
+        # raise ValueError(
+        #     f"Unsupported loss mode: {loss_name}. Supported modes are: {list(POLICY_LOSS_REGISTRY.keys())}"
+        # )
+        #------THREEGOLDCHANGE--------#
     return POLICY_LOSS_REGISTRY[loss_name]
 
 
@@ -1062,6 +1074,25 @@ def kl_penalty(logprob: torch.FloatTensor, ref_logprob: torch.FloatTensor, kl_pe
         kld = (ratio - kl - 1).contiguous()
         return torch.clamp(kld, min=-10, max=10)
 
+    #------THREEGOLDCHANGE--------#
+    '''
+    1. 支持自定义的kl penalty
+    follow:https://github.com/verl-project/verl/blob/d5c5daa84290b445f071fb812a1731a7325f350f/verl/trainer/ppo/core_algos.py#L2126
+    '''
+    if kl_penalty in ("k3+"):
+        kl = ref_logprob - logprob
+        # For numerical stability
+        kl = torch.clamp(kl, min=-20, max=20)
+        ratio = torch.exp(kl)
+        kld = (ratio - kl - 1).contiguous()
+        k3 = torch.clamp(kld, min=-10, max=10)
+        
+        k2 = 0.5 * (logprob - ref_logprob).square()
+        return k2-k2.detach()+k3.detach()
+    #------THREEGOLDCHANGE--------#
+    
+    
+    
     if kl_penalty == "full":
         # so, here logprob and ref_logprob should contain the logits for every token in vocabulary
         raise NotImplementedError

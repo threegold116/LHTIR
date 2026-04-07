@@ -1,3 +1,4 @@
+import os
 import torch
 import numpy as np
 from collections import defaultdict
@@ -186,7 +187,7 @@ def compute_grpo_mathtir_outcome_advantage(
     logger.error(f"final_scores time: {t7 - t6}")
     #--------THREEGOLDCHANGE--------#
     final_scores = final_scores * response_mask
-
+    
     return final_scores, final_scores
 @register_adv_est("mathtir_fast")
 def compute_grpo_mathtir_fast_outcome_advantage(
@@ -382,7 +383,15 @@ def compute_grpo_mathtir_fast_outcome_advantage(
     logger.error(f"final_scores time: {t7 - t6}")
     #--------THREEGOLDCHANGE--------#
     final_scores = final_scores * response_mask
-
+    if "4" in os.environ.get("RAY_DEBUG_MODE","0"):
+        breakpoint()
+        fast_final_scores,_ = compute_grpo_mathtir_outcome_advantage(
+            token_level_rewards=token_level_rewards,
+            response_mask=response_mask,
+            index=index,
+            norm_adv_by_std_in_grpo=True,
+        )
+        assert torch.allclose(fast_final_scores, final_scores), f"max diff: {(fast_final_scores - final_scores).abs().max()}"
     return final_scores, final_scores
 
 def _smoke_test_mathtir_adv(bsz: int = 4, seq_len: int = 24, rollout_n: int = 2):
