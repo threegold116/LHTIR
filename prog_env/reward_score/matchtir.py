@@ -284,7 +284,7 @@ def preprocess_text(text: str) -> str:
     text = text.strip()
     return text
 
-def compute_answer_f1(response: str, codes: dict, unsolved_set: dict, solve_rate: float, split: str, answer: str = None, gt_tool_call: list = None):
+def compute_answer_f1(response: str, codes: dict, unsolved_set: dict, solve_rate: float, split: str, answer: str = None, gt_tool_call: list = None, tokenizer=None, valid_response_ids=None):
     if split == "train":
         response = response.strip().removesuffix(
                 '<|endoftext|>').strip().removesuffix('<|im_end|>').strip()
@@ -315,7 +315,42 @@ def compute_answer_f1(response: str, codes: dict, unsolved_set: dict, solve_rate
         else:
             return 0
     elif split == "test":  
-        return compute_solve_f1(response, codes, unsolved_set, solve_rate, split, answer, gt_tool_call, tokenizer, valid_response_ids)
+        #------THREEGOLDCHANGE--------#
+        '''
+        1. test和train保持一致
+        通过修改reward.function.name实现
+        '''
+        #TODO:需要改成answer-level的f1
+        # return compute_solve_f1(response, codes, unsolved_set, solve_rate, split, answer, gt_tool_call, tokenizer, valid_response_ids)
+        response = response.strip().removesuffix(
+                '<|endoftext|>').strip().removesuffix('<|im_end|>').strip()
+        try:
+            answer_match = re.search(r'<answer>(.*?)</answer>', response, re.DOTALL)
+            if answer_match:
+                pd_answer = answer_match.group(1).strip()
+                pd_answer = preprocess_text(pd_answer)
+            else:
+                return 0 
+        except Exception as e:
+            print(f"Error extracting answer content: {e}")
+            return 0
+
+        gt_answer = preprocess_text(answer)
+
+        pred_tokens = set(pd_answer.split())
+        gt_tokens = set(gt_answer.split())
+
+        common_tokens = pred_tokens & gt_tokens
+
+        precision = len(common_tokens) / len(pred_tokens) if pred_tokens else 0
+        recall = len(common_tokens) / len(gt_tokens) if gt_tokens else 0
+
+        if precision + recall > 0: 
+            f1 = 2 * (precision * recall) / (precision + recall)
+            return f1
+        else:
+            return 0
+        #------THREEGOLDCHANGE--------#
 
 def tool_similarity(pred: dict, gt: dict) -> float:
     score = 0.0

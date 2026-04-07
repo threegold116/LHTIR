@@ -1160,6 +1160,8 @@ class RayPPOTrainer:
         self.global_steps += 1
         last_val_metrics = None
         self.max_steps_duration = 0
+        if "1" in os.environ.get("RAY_DEBUG_MODE", "0"):
+            breakpoint()
         for epoch in range(self.config.trainer.total_epochs):
             for batch_dict in self.train_dataloader:
                 metrics = {}

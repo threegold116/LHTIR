@@ -23,7 +23,7 @@ now() {
 }
 TIMESTAMP=$(now)
 PROJECT_NAME="qwen3-4b_ftrl_multiturn"
-EXPERIMENT_NAME="qwen3-4b_ftrl_multiturn-no_kl_no_ent-n_8-no_kl_no_ent-mask_func-test-speed"
+EXPERIMENT_NAME="qwen3-4b_ftrl_multiturn-no_kl_no_ent-n_8-mask_func-seq_mean_token_mean"
 ROLLOUT_DIR="$PROJECT_DIR/rollout/$PROJECT_NAME/$EXPERIMENT_NAME"
 DEFAULT_LOCAL_DIR="$PROJECT_DIR/checkpoints/$PROJECT_NAME/$EXPERIMENT_NAME"
 mkdir -p "$DEFAULT_LOCAL_DIR"
@@ -34,7 +34,7 @@ python3 -m verl.trainer.main_ppo \
     --config-path="$CONFIG_PATH" \
     --config-name='ftrl_multiturn' \
     hydra.run.dir=$DEFAULT_LOCAL_DIR/output/${TIMESTAMP} \
-    algorithm.adv_estimator=mathtir \
+    algorithm.adv_estimator=mathtir_fast \
     data.train_batch_size=256 \
     data.val_batch_size=256 \
     data.max_prompt_length=7000 \
@@ -54,6 +54,7 @@ python3 -m verl.trainer.main_ppo \
     actor_rollout_ref.actor.use_kl_loss=False \
     actor_rollout_ref.actor.kl_loss_coef=0 \
     actor_rollout_ref.actor.kl_loss_type=low_var_kl \
+    actor_rollout_ref.actor.loss_agg_mode="seq-mean-token-mean" \
     actor_rollout_ref.actor.entropy_coeff=0 \
     actor_rollout_ref.model.enable_gradient_checkpointing=True \
     actor_rollout_ref.actor.fsdp_config.param_offload=True \

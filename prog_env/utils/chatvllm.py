@@ -26,7 +26,7 @@ class ChatVLLM:
                 )
         elif args.engine == "remote":
             self.engine = AsyncLLMServer(
-                model_name="MatchTIR",
+                model_name=getattr(args, "model_alias", "MatchTIR"),
                 base_url=args.base_url,
                 concurrency=args.concurrency,
                 max_tokens=args.max_tokens,

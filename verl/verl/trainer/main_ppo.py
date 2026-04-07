@@ -100,7 +100,8 @@ class TaskRunner:
         """
         # Print the initial configuration. `resolve=True` will evaluate symbolic values.
         from pprint import pprint
-
+        if "1" in os.environ.get("RAY_DEBUG_MODE", "0"):
+            breakpoint()
         from omegaconf import OmegaConf
 
         from verl.utils.fs import copy_to_local

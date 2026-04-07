@@ -114,6 +114,12 @@ class AgentLoopMetrics(BaseModel):
 
     generate_sequences: float = 0.0
     tool_calls: float = 0.0
+    #--------THREEGOLDCHANGE--------#
+    '''
+    2.在AgentLoopMetrics中增加step_length的传入:follow MatchTIR
+    '''
+    step_length: list[float] = []
+    #--------THREEGOLDCHANGE--------#
 
 
 class AgentLoopOutput(BaseModel):
@@ -431,10 +437,23 @@ class AgentLoopWorker:
         '''
         6.在_postprocess中增加codes的传入:follow MatchTIR
         '''
-        #--------THREEGOLDCHANGE--------#
+        step_length = np.array([np.mean(m["step_length"]) for m in metrics], dtype=np.float32)
         codes = np.array([input.codes for input in inputs], dtype=object)
-        return DataProto(batch=batch, non_tensor_batch={"__num_turns__": num_turns, "codes": codes}, meta_info={"metrics": metrics})
-
+        #--------THREEGOLDCHANGE--------#
+        '''
+        增加step_length的存储:__step_length__
+        '''
+        # return DataProto(batch=batch, non_tensor_batch={"__num_turns__": num_turns, "codes": codes}, meta_info={"metrics": metrics})
+        return DataProto(
+            batch=batch,
+            non_tensor_batch={
+                "__num_turns__": num_turns,
+                "codes": codes,
+                "__step_length__": step_length,
+            },
+            meta_info={"metrics": metrics},
+        )
+        #--------THREEGOLDCHANGE--------#
 
 async def get_trajectory_info(step, index, validate):
     """Get trajectory info.

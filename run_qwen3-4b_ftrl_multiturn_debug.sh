@@ -24,20 +24,20 @@ now() {
 }
 TIMESTAMP=$(now)
 PROJECT_NAME="qwen3-4b_ftrl_multiturn"
-EXPERIMENT_NAME="qwen3-4b_ftrl_multiturn-no_kl_no_ent-n_16-origin_speed_test-agent_loop_8-bz_256-rollout_16-use_fused_kernels-ppo_60000"
+EXPERIMENT_NAME="qwen3-4b_ftrl_multiturn-no_kl_no_ent-n_16-origin_speed_test-agent_loop_8-bz_256-rollout_16-use_fused_kernels-step_4096-ppo_90000"
 ROLLOUT_DIR="$PROJECT_DIR/rollout/$PROJECT_NAME/$EXPERIMENT_NAME"
 DEFAULT_LOCAL_DIR="$PROJECT_DIR/checkpoints/$PROJECT_NAME/$EXPERIMENT_NAME"
 mkdir -p "$DEFAULT_LOCAL_DIR"
 LOG_FILE="$DEFAULT_LOCAL_DIR/$TIMESTAMP.log"
-MODEL="/share/home/sxjiang/model/Qwen3-4B"
+MODEL="/share/home/sxjiang/model/Qwen3-4B-Thinking-2507"
 
 python3 -m verl.trainer.main_ppo \
     --config-path="$CONFIG_PATH" \
     --config-name='ftrl_multiturn' \
     hydra.run.dir=$DEFAULT_LOCAL_DIR/output/${TIMESTAMP} \
     algorithm.adv_estimator=mathtir_fast \
-    data.train_batch_size=256 \
-    data.val_batch_size=256 \
+    data.train_batch_size=8 \
+    data.val_batch_size=8 \
     data.max_prompt_length=7000 \
     data.max_response_length=23000 \
     data.prompt_key=messages\
@@ -52,8 +52,8 @@ python3 -m verl.trainer.main_ppo \
     actor_rollout_ref.model.use_fused_kernels=True \
     actor_rollout_ref.model.use_liger=False \
     actor_rollout_ref.actor.use_dynamic_bsz=True \
-    actor_rollout_ref.actor.ppo_mini_batch_size=32 \
-    actor_rollout_ref.actor.ppo_max_token_len_per_gpu=60000 \
+    actor_rollout_ref.actor.ppo_mini_batch_size=8 \
+    actor_rollout_ref.actor.ppo_max_token_len_per_gpu=90000 \
     actor_rollout_ref.actor.use_kl_loss=False \
     actor_rollout_ref.actor.kl_loss_coef=0 \
     actor_rollout_ref.actor.kl_loss_type=low_var_kl \
@@ -64,9 +64,11 @@ python3 -m verl.trainer.main_ppo \
     actor_rollout_ref.rollout.tensor_model_parallel_size=1 \
     actor_rollout_ref.rollout.name=sglang \
     actor_rollout_ref.rollout.mode=async \
+    actor_rollout_ref.rollout.disable_log_stats=False \
     actor_rollout_ref.rollout.multi_turn.max_assistant_turns=10 \
     actor_rollout_ref.rollout.multi_turn.max_user_turns=10 \
     actor_rollout_ref.rollout.multi_turn.max_parallel_calls=10 \
+    +actor_rollout_ref.rollout.multi_turn.max_step_length=4096 \
     +actor_rollout_ref.rollout.custom_cls.path=pkg://prog_env.agent_loop \
     +actor_rollout_ref.rollout.custom_cls.name=AgentLoopManager \
     actor_rollout_ref.rollout.gpu_memory_utilization=0.75 \

@@ -22,13 +22,13 @@ now() {
     date '+%Y-%m-%d_%H-%M-%S'
 }
 TIMESTAMP=$(now)
-PROJECT_NAME="qwen3-4b_ftrl_multiturn"
-EXPERIMENT_NAME="qwen3-4b_ftrl_multiturn-no_kl_no_ent-n_8-step_2048"
+PROJECT_NAxME="qwen3-4b_ftrl_multiturn"
+EXPERIMENT_NAME="qwen3-4b-2507_ftrl_multiturn-no_kl_no_ent-n_8-step_2048-answer_f1"
 ROLLOUT_DIR="$PROJECT_DIR/rollout/$PROJECT_NAME/$EXPERIMENT_NAME"
 DEFAULT_LOCAL_DIR="$PROJECT_DIR/checkpoints/$PROJECT_NAME/$EXPERIMENT_NAME"
 mkdir -p "$DEFAULT_LOCAL_DIR"
 LOG_FILE="$DEFAULT_LOCAL_DIR/$TIMESTAMP.log"
-MODEL="/share/home/sxjiang/model/Qwen3-4B"
+MODEL="/share/home/sxjiang/model/Qwen3-4B-Thinking-2507"
 
 
 # sleep_time=40000
@@ -45,7 +45,7 @@ python3 -m verl.trainer.main_ppo \
     --config-path="$CONFIG_PATH" \
     --config-name='ftrl_multiturn' \
     hydra.run.dir=$DEFAULT_LOCAL_DIR/output/${TIMESTAMP} \
-    algorithm.adv_estimator=mathtir \
+    algorithm.adv_estimator=grpo \
     data.train_batch_size=256 \
     data.val_batch_size=256 \
     data.max_prompt_length=7000 \
@@ -99,7 +99,8 @@ python3 -m verl.trainer.main_ppo \
     trainer.total_epochs=3 \
     reward_model.reward_manager=matchtir \
     custom_reward_function.path=$PROJECT_DIR/prog_env/reward_score/matchtir.py \
-    custom_reward_function.name=compute_process_KM \
+    custom_reward_function.name=compute_answer_f1 \
+    actor_rollout_ref.actor.loss_agg_mode="token-mean" \
     actor_rollout_ref.rollout.update_weights_bucket_megabytes=512 2>&1 | tee $LOG_FILE
 
 #gpu_memory_utilization

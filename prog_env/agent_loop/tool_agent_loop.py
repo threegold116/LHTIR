@@ -209,9 +209,11 @@ class ToolAgentLoop(AgentLoopBase):
                 - 之前max_new_tokens默认采用min(self.config.response_length, self.config.max_model_len - len(generation_prompt_ids) - 1), 而可能还存在response_length-len(response_mask)<self.config.max_model_len - len(generation_prompt_ids) - 1的情况
                 - 因为self.config.max_model_len = self.config.prompt_length + self.config.response_length而prompt_length和response_length都是模型最大长度的约束(即max_model_len是prompt_length和response_length的约束)
             '''
+            logger.error(f"instance_id: {local_instance_id}, max_step_length: {self.max_step_length}, response_length: {self.response_length}")
             max_new_tokens = min(self.max_step_length, self.response_length-len(response_mask))
             sampling_params["max_new_tokens"] = max_new_tokens  
             t2 = time.time()
+            logger.error(f"instance_id: {local_instance_id}, sampling_params: {sampling_params}")
             #--------THREEGOLDCHANGE--------#
             with simple_timer("generate_sequences", metrics):
                 response_ids = await self.server_manager.generate(
@@ -278,6 +280,12 @@ class ToolAgentLoop(AgentLoopBase):
         4.新增打印部分:logger.error打印cost_time
         '''
         logger.error(f"instance_id finished: {local_instance_id}, response_length: {len(response_mask)}, assistant_turns: {assistant_turns}, step_length_list: {step_length_list}, cost_time_list: {cost_time_list}, total_cost_time: {time.time() - t1}")
+        #--------THREEGOLDCHANGE--------#
+        '''
+        5.新增step_length_list的存储:__step_length__
+        '''
+        if step_length_list:
+            metrics["step_length"] = list(step_length_list)
         #--------THREEGOLDCHANGE--------#
         response_ids = prompt_ids[-len(response_mask) :] #裁剪prompt_ids得到response_ids
         prompt_ids = prompt_ids[: len(prompt_ids) - len(response_mask)] #裁剪response_ids得到prompt_ids

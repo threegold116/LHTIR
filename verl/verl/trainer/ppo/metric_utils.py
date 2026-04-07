@@ -98,6 +98,8 @@ def compute_data_metrics(batch: DataProto, use_critic: bool = True) -> dict[str,
             - critic/values/mean, max, min: Statistics about critic values (if use_critic=True)
             - critic/vf_explained_var: Explained variance of the value function (if use_critic=True)
             - response_length/mean, max, min, clip_ratio: Statistics about response lengths
+            - response_length/step_length/mean, max, min: Batch stats of
+              per-trajectory assistant-step metrics when ``__step_length_mean__`` is present (agent loop).
             - prompt_length/mean, max, min, clip_ratio: Statistics about prompt lengths
             - num_turns/mean, max, min: Statistics about the number of multi-turn conversations
     """
@@ -176,7 +178,18 @@ def compute_data_metrics(batch: DataProto, use_critic: bool = True) -> dict[str,
         metrics["num_turns/min"] = num_turns.min()
         metrics["num_turns/max"] = num_turns.max()
         metrics["num_turns/mean"] = num_turns.mean()
-
+    #--------THREEGOLDCHANGE--------#
+    '''
+    7.在compute_data_metrics中增加step_length_mean, step_length_max, assistant_step_count的计算:follow MatchTIR
+    '''
+    #--------THREEGOLDCHANGE--------#
+    # per-trajectory assistant step stats (from agent loop, e.g. tool_agent); logged under response_length/*
+    if "__step_length__" in batch.non_tensor_batch:
+        sm = torch.as_tensor(batch.non_tensor_batch["__step_length__"], dtype=torch.float64)
+        metrics["response_length/step_length/mean"] = float(sm.mean().detach().item())
+        metrics["response_length/step_length/max"] = float(sm.max().detach().item())
+        metrics["response_length/step_length/min"] = float(sm.min().detach().item())
+    #--------THREEGOLDCHANGE--------#
     return metrics
 
 

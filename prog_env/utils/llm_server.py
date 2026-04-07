@@ -5,7 +5,9 @@ from openai import AsyncOpenAI
 from typing import Any, Dict, List, Optional
 
 from vllm import SamplingParams,LLM
-
+import logging
+logging.basicConfig(level=logging.INFO)
+logger = logging.getLogger(__name__)
 class AsyncLLMServer:
     '''异步 LLM 服务客户端，基于 OpenAI 兼容 API 进行对话与批量推理。'''
 
@@ -33,6 +35,8 @@ class AsyncLLMServer:
         #FIXME:暂时假设只部署一个模型
         self.max_model_length = response.json()["data"][0]["max_model_len"]
         self.model_name = model_name
+        logger.info(f"Model name: {self.model_name}")
+        logger.info(f"Max model length: {self.max_model_length}")
         self.concurrency = concurrency if concurrency is not None else 8 #默认8线程
         self.sem = None
         self.max_tokens = kwargs.get("max_tokens", 4096)
