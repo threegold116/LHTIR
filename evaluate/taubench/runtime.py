@@ -38,8 +38,11 @@ class AsyncAgentResponder:
         if self.backend == "vllm":
             assert self.chat_engine is not None
             assert isinstance(self.chat_engine.engine, AsyncLLMServer)
-            raw_output = await self.chat_engine.chat_one_async(
-                messages, tools, max_tokens=self.max_tokens, temperature=self.temperature
+            raw_output = await self.chat_engine.engine.chat_one_async(
+                messages,
+                tools,
+                max_tokens=self.max_tokens,
+                temperature=self.temperature,
             )
             return parse_vllm_agent_output(raw_output)
         if self.backend == "openai":
@@ -165,4 +168,3 @@ async def run_one_task_safe(task_index: int, args, agent_responder: AsyncAgentRe
                 "traceback": traceback.format_exc(),
             },
         }
-

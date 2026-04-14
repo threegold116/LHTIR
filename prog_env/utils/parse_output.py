@@ -15,7 +15,7 @@
  """
 
 import re
-import json_repair
+# import json_repair
 from hashlib import sha256
 import datetime
 import json

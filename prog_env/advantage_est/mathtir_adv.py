@@ -465,7 +465,7 @@ def _smoke_test_mathtir_adv(bsz: int = 4, seq_len: int = 24, rollout_n: int = 2)
     )
     print("mathtir_fast_adv shape:", adv2.shape)
     assert torch.allclose(adv, adv2), f"max diff: {(adv - adv2).abs().max()}"
-    assert (returns-returns2)==torch.zeros_like(returns)
+    assert ((returns-returns2)==torch.zeros_like(returns)).all()
     print("mathtir_fast_adv smoke test OK:", adv.shape)
 
 if __name__ == "__main__":
@@ -473,8 +473,8 @@ if __name__ == "__main__":
 
     logging.basicConfig(level=logging.INFO)
     p = argparse.ArgumentParser(description="Smoke test for mathtir advantage.")
-    p.add_argument("--bsz", type=int, default=20, help="batch size (default: 4)")
-    p.add_argument("--seq-len", type=int, default=1280, help="padded response length (default: 24)")
+    p.add_argument("--bsz", type=int, default=4, help="batch size (default: 4)")
+    p.add_argument("--seq-len", type=int, default=24, help="padded response length (default: 24)")
     p.add_argument(
         "--rollout-n",
         type=int,

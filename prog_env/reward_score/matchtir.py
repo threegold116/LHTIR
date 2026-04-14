@@ -264,7 +264,73 @@ def compute_toolrl(response: str, codes: dict, unsolved_set: dict, solve_rate: f
 
     elif split == "test":  
         return compute_solve_f1(response, codes, unsolved_set, solve_rate, split, answer, gt_tool_call, tokenizer, valid_response_ids)
+#------THREEGOLDCHANGE--------#
+def normalize_answer(s):
+    def remove_articles(text):
+        return re.sub(r"\b(a|an|the)\b", " ", text)
 
+    def white_space_fix(text):
+        return " ".join(text.split())
+
+    def remove_punc(text):
+        exclude = set(string.punctuation)
+        return "".join(ch for ch in text if ch not in exclude)
+
+    def lower(text):
+        return text.lower()
+
+    return white_space_fix(remove_articles(remove_punc(lower(s))))
+
+def get_f1_score_recall(prediction: str, ground_truths:str):
+    if isinstance(ground_truths, str):
+        ground_truths = [ground_truths]
+    
+    final_metric = {"f1": 0, "precision": 0, "recall": 0}
+
+    for ground_truth in ground_truths:
+        normalized_prediction = normalize_answer(prediction)
+        normalized_ground_truth = normalize_answer(ground_truth)
+
+        if normalized_prediction in ["yes", "no", "noanswer"] and normalized_prediction != normalized_ground_truth:
+            continue
+        
+        if normalized_ground_truth in ["yes", "no", "noanswer"] and normalized_prediction != normalized_ground_truth:
+            continue
+
+        prediction_tokens = normalized_prediction.split()
+        ground_truth_tokens = normalized_ground_truth.split()
+        common = Counter(prediction_tokens) & Counter(ground_truth_tokens)
+        num_same = sum(common.values())
+        if num_same == 0:
+            continue
+        
+        precision = 1.0 * num_same / len(prediction_tokens)
+        recall = 1.0 * num_same / len(ground_truth_tokens)
+        f1 = (2 * precision * recall) / (precision + recall)
+        
+        final_metric["precision"] = max(precision, final_metric["precision"])
+        final_metric["recall"] = max(recall, final_metric["recall"])
+        final_metric["f1"] = max(f1, final_metric["f1"])
+    
+    return final_metric['f1']
+
+def compute_answer_f1_recall(response: str, codes: dict, unsolved_set: dict, solve_rate: float, split: str, answer: str = None, gt_tool_call: list = None, tokenizer=None, valid_response_ids=None):
+    response = response.strip().removesuffix(
+            '<|endoftext|>').strip().removesuffix('<|im_end|>').strip()
+    try:
+        answer_match = re.search(r'<answer>(.*?)</answer>', response, re.DOTALL)
+        if answer_match:
+            pd_answer = answer_match.group(1).strip()
+        else:
+            return 0 
+    except Exception as e:
+        print(f"Error extracting answer content: {e}")
+        return 0
+
+    return get_f1_score_recall(pd_answer, answer)
+
+
+#------THREEGOLDCHANGE--------#
 
 def preprocess_text(text: str) -> str:
     """Preprocess text for dataset scoring.

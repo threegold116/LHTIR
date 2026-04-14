@@ -39,7 +39,7 @@ def parse_arguments():
     parser.add_argument("--user_base_url", type=str)
     parser.add_argument("--user_api_key", type=str)
     parser.add_argument("--user_temperature", type=float, default=0.0)
-    parser.add_argument("--user_max_tokens", type=int, default=1024)
+    parser.add_argument("--user_max_tokens", type=int, default=4096)
     return parser.parse_args()
 
 
@@ -113,6 +113,7 @@ def main():
     )
 
     user_responder = None
+    user_chat_engine = None
     if args.scenario == "agent_multi_turn":
         if args.user_backend == "vllm":
             user_base_url = args.user_base_url or args.base_url
@@ -126,11 +127,18 @@ def main():
                     max_tokens=args.user_max_tokens,
                 )
             else:
+                user_args = copy.deepcopy(args)
+                user_args.base_url = user_base_url
+                user_args.concurrency = 128
+                user_args.enable_thinking = False
+                user_args.model_alias = user_model_name
+                user_args.max_tokens = args.user_max_tokens
+                user_args.temperature = args.user_temperature
+                user_chat_engine = ChatVLLM(user_args)
                 user_responder = AsyncChatResponder(
-                    backend="openai",
+                    backend="vllm",
                     model_name=user_model_name,
-                    api_key=args.user_api_key,
-                    base_url=user_base_url,
+                    chat_engine=user_chat_engine,
                     temperature=args.user_temperature,
                     max_tokens=args.user_max_tokens,
                 )
@@ -147,6 +155,8 @@ def main():
     for i in trange(0, len(data), args.batch_size):
         if isinstance(agent_chat_engine.engine, AsyncLLMServer):
             agent_chat_engine.engine.set_sem()
+        if user_chat_engine is not None and isinstance(user_chat_engine.engine, AsyncLLMServer):
+            user_chat_engine.engine.set_sem()
         batch = data[i : i + args.batch_size]
         filter_batch = [sample for sample in batch if (sample["id"], f"ACEBench/{args.scenario}") not in ids]
         if not filter_batch:

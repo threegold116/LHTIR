@@ -46,7 +46,12 @@ class AsyncTextResponder:
         if self.backend == "vllm":
             assert self.chat_engine is not None
             assert isinstance(self.chat_engine.engine, AsyncLLMServer)
-            return await self.chat_engine.chat_one_async(messages, None, max_tokens=self.max_tokens, temperature=self.temperature)
+            return await self.chat_engine.engine.chat_one_async(
+                messages,
+                None,
+                max_tokens=self.max_tokens,
+                temperature=self.temperature,
+            )
         if self.backend == "openai":
             response = await self.client.chat.completions.create(
                 model=self.model_name,
@@ -83,4 +88,3 @@ class TauBenchUserSimulator:
 
     def get_total_cost(self) -> float:
         return self.responder.get_total_cost()
-

@@ -99,12 +99,22 @@ def main():
         max_tokens=args.max_tokens,
     )
 
+    user_chat_engine = None
     if args.user_backend == "vllm":
-        user_chat_engine = shared_chat_engine
-        user_model_name = args.user_model_name
-        user_base_url = args.base_url
+        user_base_url = args.user_base_url or args.base_url
+        user_model_name = args.user_model_name or args.model_alias
+        if user_base_url == args.base_url and user_model_name == args.model_alias:
+            user_chat_engine = shared_chat_engine
+        else:
+            user_args = argparse.Namespace(**vars(args))
+            user_args.base_url = user_base_url
+            user_args.concurrency = 128
+            user_args.enable_thinking = False
+            user_args.model_alias = user_model_name
+            user_args.max_tokens = args.user_max_tokens
+            user_args.temperature = args.user_temperature
+            user_chat_engine = ChatVLLM(user_args)
     else:
-        user_chat_engine = None
         user_model_name = args.user_model_name
         user_base_url = args.user_base_url
 
@@ -122,6 +132,8 @@ def main():
     for i in trange(0, len(task_ids), args.batch_size):
         if shared_chat_engine is not None and isinstance(shared_chat_engine.engine, AsyncLLMServer):
             shared_chat_engine.engine.set_sem()
+        if user_chat_engine is not None and user_chat_engine is not shared_chat_engine and isinstance(user_chat_engine.engine, AsyncLLMServer):
+            user_chat_engine.engine.set_sem()
         batch_task_ids = task_ids[i : i + args.batch_size]
         batch_task_ids = [task_id for task_id in batch_task_ids if (task_id, data_source) not in finished]
         if not batch_task_ids:

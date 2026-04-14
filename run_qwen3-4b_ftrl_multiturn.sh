@@ -22,8 +22,8 @@ now() {
     date '+%Y-%m-%d_%H-%M-%S'
 }
 TIMESTAMP=$(now)
-PROJECT_NAxME="qwen3-4b_ftrl_multiturn"
-EXPERIMENT_NAME="qwen3-4b-2507_ftrl_multiturn-no_kl_no_ent-n_8-step_2048-answer_f1"
+PROJECT_NAME="qwen3-4b_ftrl_multiturn"
+EXPERIMENT_NAME="qwen3-4b-2507_ftrl_multiturn-no_kl_no_ent-n_8-step_2048-answer_f1_recall"
 ROLLOUT_DIR="$PROJECT_DIR/rollout/$PROJECT_NAME/$EXPERIMENT_NAME"
 DEFAULT_LOCAL_DIR="$PROJECT_DIR/checkpoints/$PROJECT_NAME/$EXPERIMENT_NAME"
 mkdir -p "$DEFAULT_LOCAL_DIR"
@@ -99,7 +99,7 @@ python3 -m verl.trainer.main_ppo \
     trainer.total_epochs=3 \
     reward_model.reward_manager=matchtir \
     custom_reward_function.path=$PROJECT_DIR/prog_env/reward_score/matchtir.py \
-    custom_reward_function.name=compute_answer_f1 \
+    custom_reward_function.name=compute_answer_f1_recall \
     actor_rollout_ref.actor.loss_agg_mode="token-mean" \
     actor_rollout_ref.rollout.update_weights_bucket_megabytes=512 2>&1 | tee $LOG_FILE
 

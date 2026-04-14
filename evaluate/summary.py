@@ -14,7 +14,7 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument(
         "--results_dir",
         type=str,
-        default="/share/home/sxjiang/myproject/LHTIR/results/",
+        default="/share/home/sxjiang/myproject/LHTIR/results/ToolHop/Qwen3-4B",
         help=(
             "Directory containing JSONL result files "
             "(default: results/ToolHop/Qwen3-4B)."
