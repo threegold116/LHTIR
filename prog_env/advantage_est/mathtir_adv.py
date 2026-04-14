@@ -121,6 +121,8 @@ def compute_grpo_mathtir_outcome_advantage(
     t3 = time.time()
     logger.error(f"step_key2score time: {t3 - t2}")
     #--------THREEGOLDCHANGE--------#
+    #TODO:这里改成batch-level的std/mean会不会好一些，或者去除std?
+    #TODO:或者看看其他step-level的adv estimator是怎么做的?
     for i in range(bsz):
         disc = discounted_rewards_list[i]
         T = len(disc)

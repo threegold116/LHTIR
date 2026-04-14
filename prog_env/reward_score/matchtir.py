@@ -264,7 +264,73 @@ def compute_toolrl(response: str, codes: dict, unsolved_set: dict, solve_rate: f
 
     elif split == "test":  
         return compute_solve_f1(response, codes, unsolved_set, solve_rate, split, answer, gt_tool_call, tokenizer, valid_response_ids)
+#------THREEGOLDCHANGE--------#
+def normalize_answer(s):
+    def remove_articles(text):
+        return re.sub(r"\b(a|an|the)\b", " ", text)
 
+    def white_space_fix(text):
+        return " ".join(text.split())
+
+    def remove_punc(text):
+        exclude = set(string.punctuation)
+        return "".join(ch for ch in text if ch not in exclude)
+
+    def lower(text):
+        return text.lower()
+
+    return white_space_fix(remove_articles(remove_punc(lower(s))))
+
+def get_f1_score_recall(prediction: str, ground_truths:str):
+    if isinstance(ground_truths, str):
+        ground_truths = [ground_truths]
+    
+    final_metric = {"f1": 0, "precision": 0, "recall": 0}
+
+    for ground_truth in ground_truths:
+        normalized_prediction = normalize_answer(prediction)
+        normalized_ground_truth = normalize_answer(ground_truth)
+
+        if normalized_prediction in ["yes", "no", "noanswer"] and normalized_prediction != normalized_ground_truth:
+            continue
+        
+        if normalized_ground_truth in ["yes", "no", "noanswer"] and normalized_prediction != normalized_ground_truth:
+            continue
+
+        prediction_tokens = normalized_prediction.split()
+        ground_truth_tokens = normalized_ground_truth.split()
+        common = Counter(prediction_tokens) & Counter(ground_truth_tokens)
+        num_same = sum(common.values())
+        if num_same == 0:
+            continue
+        
+        precision = 1.0 * num_same / len(prediction_tokens)
+        recall = 1.0 * num_same / len(ground_truth_tokens)
+        f1 = (2 * precision * recall) / (precision + recall)
+        
+        final_metric["precision"] = max(precision, final_metric["precision"])
+        final_metric["recall"] = max(recall, final_metric["recall"])
+        final_metric["f1"] = max(f1, final_metric["f1"])
+    
+    return final_metric['f1']
+
+def compute_answer_f1_recall(response: str, codes: dict, unsolved_set: dict, solve_rate: float, split: str, answer: str = None, gt_tool_call: list = None, tokenizer=None, valid_response_ids=None):
+    response = response.strip().removesuffix(
+            '<|endoftext|>').strip().removesuffix('<|im_end|>').strip()
+    try:
+        answer_match = re.search(r'<answer>(.*?)</answer>', response, re.DOTALL)
+        if answer_match:
+            pd_answer = answer_match.group(1).strip()
+        else:
+            return 0 
+    except Exception as e:
+        print(f"Error extracting answer content: {e}")
+        return 0
+
+    return get_f1_score_recall(pd_answer, answer)
+
+
+#------THREEGOLDCHANGE--------#
 
 def preprocess_text(text: str) -> str:
     """Preprocess text for dataset scoring.
@@ -283,6 +349,40 @@ def preprocess_text(text: str) -> str:
     
     text = text.strip()
     return text
+#------THREEGOLDCHANGE--------#
+from prog_env.reward_score.search_r1_like_qa_em import em_check, subem_check
+def compute_answer_em(response: str, codes: dict, unsolved_set: dict, solve_rate: float, split: str, answer: str = None, gt_tool_call: list = None, tokenizer=None, valid_response_ids=None):
+    response = response.strip().removesuffix(
+            '<|endoftext|>').strip().removesuffix('<|im_end|>').strip()
+    try:
+        answer_match = re.search(r'<answer>(.*?)</answer>', response, re.DOTALL)
+        if answer_match:
+            pd_answer = answer_match.group(1).strip()
+        else:
+            return 0 
+    except Exception as e:
+        print(f"Error extracting answer content: {e}")
+        return 0
+
+    return em_check(pd_answer, answer)
+def compute_answer_subem(response: str, codes: dict, unsolved_set: dict, solve_rate: float, split: str, answer: str = None, gt_tool_call: list = None, tokenizer=None, valid_response_ids=None):
+    response = response.strip().removesuffix(
+            '<|endoftext|>').strip().removesuffix('<|im_end|>').strip()
+    try:
+        answer_match = re.search(r'<answer>(.*?)</answer>', response, re.DOTALL)
+        if answer_match:
+            pd_answer = answer_match.group(1).strip()
+        else:
+            return 0 
+    except Exception as e:
+        print(f"Error extracting answer content: {e}")
+        return 0
+
+    return subem_check(pd_answer, answer)
+    
+
+#------THREEGOLDCHANGE--------#
+
 
 def compute_answer_f1(response: str, codes: dict, unsolved_set: dict, solve_rate: float, split: str, answer: str = None, gt_tool_call: list = None, tokenizer=None, valid_response_ids=None):
     if split == "train":
@@ -530,6 +630,146 @@ def compute_process_KM(response: str, codes: dict, unsolved_set: dict, solve_rat
     elif split == "test":  
         return compute_solve_f1(response, codes, unsolved_set, solve_rate, split, answer, gt_tool_call, tokenizer, valid_response_ids)
 
+#-----THREEGOLDCHANGE--------#
+def compute_process_KM_recall_f1(response: str, codes: dict, unsolved_set: dict, solve_rate: float, split: str, answer: str = None, gt_tool_call: list = None, tokenizer=None, valid_response_ids=None):
+    if split == "train":
+        if isinstance(gt_tool_call, str):
+            gt_tool_call = json.loads(gt_tool_call)
+        scores = [0.0] * len(valid_response_ids)
+       
+        search_start = 0
+
+        chats = response.split("\n<|im_start|>assistant\n")
+        chats_size = len(chats)
+        
+        process_reward = [0.0] * chats_size
+        count_per_turn = [0] * chats_size
+
+        tool_call_list = []
+        tool_to_turn_index = []
+        for i, chat in enumerate(chats):
+            chat = chat.strip().removesuffix('<|endoftext|>').strip().removesuffix('<|im_end|>').strip()
+            answer_match = re.search(r'<answer>(.*?)</answer>', chat, re.DOTALL)
+            if not answer_match:
+                parsed_response = parse_qwen(chat)
+                pd_tools = parsed_response.get("tool_calls") or []
+                if len(pd_tools) > 0:
+                    for j, pd_tool in enumerate(pd_tools):
+                        tool_call_list.append(pd_tool["function"])
+                        tool_to_turn_index.append(i)
+            else :
+                pd_answer = answer_match.group(1).strip()
+                                
+                process_reward[i] = get_f1_score_recall(pd_answer, answer)
+
+        tool_call_reward = assign_rewards_hungarian(tool_call_list, gt_tool_call, unmatched_penalty=0)
+
+        for reward, turn_idx in zip(tool_call_reward, tool_to_turn_index):
+            process_reward[turn_idx] += reward
+            count_per_turn[turn_idx] += 1
+
+        for i in range(chats_size):
+            if count_per_turn[i] > 0:
+                process_reward[i] /= count_per_turn[i]
+        sep_str = "\n<|im_start|>assistant\n"
+        sep_ids = tokenizer.encode(sep_str, add_special_tokens=False)
+
+        start_positions = [0]
+
+        start_positions += find_all_subsequence(valid_response_ids, sep_ids)
+
+        end_str = "<|im_end|>"
+        end_ids = tokenizer.encode(end_str, add_special_tokens=False)
+ 
+        turns = []
+        for s in start_positions:
+            rel_pos = find_all_subsequence(valid_response_ids[s:], end_ids)
+            
+            if len(rel_pos) == 0:
+                e = len(valid_response_ids)
+            else:
+                e = s + rel_pos[0] + len(end_ids)
+
+            turns.append((s, e))
+
+        for i, turn in enumerate(turns): #turn-level reward
+            start, end = turn
+            scores[start:end] = [0.0] * (end - start)
+            scores[end - 1] = process_reward[i]
+
+        return scores
+    elif split == "test":  
+        return compute_solve_f1(response, codes, unsolved_set, solve_rate, split, answer, gt_tool_call, tokenizer, valid_response_ids)
+def compute_process_KM_em(response: str, codes: dict, unsolved_set: dict, solve_rate: float, split: str, answer: str = None, gt_tool_call: list = None, tokenizer=None, valid_response_ids=None):
+    if split == "train":
+        if isinstance(gt_tool_call, str):
+            gt_tool_call = json.loads(gt_tool_call)
+        scores = [0.0] * len(valid_response_ids)
+       
+        search_start = 0
+
+        chats = response.split("\n<|im_start|>assistant\n")
+        chats_size = len(chats)
+        
+        process_reward = [0.0] * chats_size
+        count_per_turn = [0] * chats_size
+
+        tool_call_list = []
+        tool_to_turn_index = []
+        for i, chat in enumerate(chats):
+            chat = chat.strip().removesuffix('<|endoftext|>').strip().removesuffix('<|im_end|>').strip()
+            answer_match = re.search(r'<answer>(.*?)</answer>', chat, re.DOTALL)
+            if not answer_match:
+                parsed_response = parse_qwen(chat)
+                pd_tools = parsed_response.get("tool_calls") or []
+                if len(pd_tools) > 0:
+                    for j, pd_tool in enumerate(pd_tools):
+                        tool_call_list.append(pd_tool["function"])
+                        tool_to_turn_index.append(i)
+            else :
+                pd_answer = answer_match.group(1).strip()
+                                
+                process_reward[i] = em_check(pd_answer, answer)
+
+        tool_call_reward = assign_rewards_hungarian(tool_call_list, gt_tool_call, unmatched_penalty=0)
+
+        for reward, turn_idx in zip(tool_call_reward, tool_to_turn_index):
+            process_reward[turn_idx] += reward
+            count_per_turn[turn_idx] += 1
+
+        for i in range(chats_size):
+            if count_per_turn[i] > 0:
+                process_reward[i] /= count_per_turn[i]
+        sep_str = "\n<|im_start|>assistant\n"
+        sep_ids = tokenizer.encode(sep_str, add_special_tokens=False)
+
+        start_positions = [0]
+
+        start_positions += find_all_subsequence(valid_response_ids, sep_ids)
+
+        end_str = "<|im_end|>"
+        end_ids = tokenizer.encode(end_str, add_special_tokens=False)
+ 
+        turns = []
+        for s in start_positions:
+            rel_pos = find_all_subsequence(valid_response_ids[s:], end_ids)
+            
+            if len(rel_pos) == 0:
+                e = len(valid_response_ids)
+            else:
+                e = s + rel_pos[0] + len(end_ids)
+
+            turns.append((s, e))
+
+        for i, turn in enumerate(turns): #turn-level reward
+            start, end = turn
+            scores[start:end] = [0.0] * (end - start)
+            scores[end - 1] = process_reward[i]
+
+        return scores
+    elif split == "test":  
+        return compute_solve_f1(response, codes, unsolved_set, solve_rate, split, answer, gt_tool_call, tokenizer, valid_response_ids)
+#-----THREEGOLDCHANGE--------#
 
 
 
