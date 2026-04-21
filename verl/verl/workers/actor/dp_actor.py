@@ -364,6 +364,13 @@ class DataParallelPPOActor(BasePPOActor):
             "old_log_probs",
             "advantages",
         ]
+        #------THREEGOLDCHANGE--------#
+        '''
+        1.新增select_keys: prompts，用于传递prompts到actor，计算vaild_length
+        '''
+        if "prompts" in data.batch.keys():
+            select_keys.append("prompts")
+        #------THREEGOLDCHANGE--------#
         if self.config.use_kl_loss:
             select_keys.append("ref_log_prob")
 
@@ -445,6 +452,9 @@ class DataParallelPPOActor(BasePPOActor):
                             loss_agg_mode=loss_agg_mode,
                             entropy=entropy,
                             config=self.config,
+                            attention_mask=model_inputs.get("attention_mask", None),
+                            prompts=model_inputs.get("prompts", None),
+                            input_ids=model_inputs.get("input_ids", None),
                         )
                         #------THREEGOLDCHANGE--------#
 
