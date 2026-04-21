@@ -446,6 +446,8 @@ class MegatronPPOActor(BasePPOActor):
                         response_mask=response_mask,
                         loss_agg_mode=loss_agg_mode,
                         config=self.config,
+                        #------THREEGOLDCHANGE--------#
+                        #TODO: add entropy, attention_mask, prompts, input_ids if needed megatron actor
                     )
 
                 stats.update(
