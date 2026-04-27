@@ -83,14 +83,14 @@ trap cleanup INT TERM EXIT # 移除了 EXIT，因为正常结束我们手动杀
 
 evaluation_file="evaluation_toolhop.py"
 file="toolhop/ToolHop.jsonl"
-model="/share/home/sxjiang/myproject/LHTIR/checkpoints/merged_checkpoints/qwen3-4b-2507_ftrl_multiturn-entropy_0_01-no_kl-step_2048-n_8-MATCHTIR_KM-24"
+model="/share/home/sxjiang/myproject/LHTIR/checkpoints/merged_checkpoints/qwen3-4b-2507_ftrl_multiturn-no_kl_no_ent-n_8-step_2048-gtpo_loss-clip_low3e-3_high4e-3_seq_mean_turn_mean_token_mean-process_reward-MATCHTIR_KM-24"
 
 vllm_run $model
 # for scenario in "Free" "Direct" "Mandatory"; do
 
-for scenario in "Free" "Direct" "Mandatory"; do
-    save_file="$PROJECT_DIR/results/ToolHop/Qwen3-4B/MatchTIR-KM-24-2507-entropy_0_01-no_kl-n_8-step_2048-${scenario}-vllm-4096.jsonl"
-    LOG_FILE="$PROJECT_DIR/results/ToolHop/Qwen3-4B/eval_toolhop_vllm_${CURRENT_TIME}_${scenario}-MatchTIR-KM-24-2507-entropy_0_01-no_kl-n_8-step_2048.log"
+for scenario in "Free"; do
+    save_file="$PROJECT_DIR/results/ToolHop/Qwen3-4B/MatchTIR-KM-24-2507-no_kl_no_ent-n_8-step_2048-gtpo_loss-clip_low3e-3_high4e-3_seq_mean_turn_mean_token_mean-process_reward-seed1-2-${scenario}-vllm-4096.jsonl"
+    LOG_FILE="$PROJECT_DIR/results/ToolHop/Qwen3-4B/eval_toolhop_vllm_${CURRENT_TIME}_${scenario}-MatchTIR-KM-24-2507-no_kl_no_ent-n_8-step_2048-gtpo_loss-clip_low3e-3_high4e-3_seq_mean_turn_mean_token_mean-process_reward-seed1-2.log"
     python3 $PROJECT_DIR/evaluate/${evaluation_file} \
         --scenario ${scenario} \
         --series qwen \
@@ -109,94 +109,5 @@ for scenario in "Free" "Direct" "Mandatory"; do
 done
 
 vllm_kill
-
-#################################################
-evaluation_file="evaluation_toolhop.py"
-file="toolhop/ToolHop.jsonl"
-model="/share/home/sxjiang/myproject/LHTIR/checkpoints/merged_checkpoints/qwen3-4b-2507_ftrl_multiturn-no_kl_no_ent-n_8-step_3200-MATCHTIR_KM-24"
-vllm_run $model
-# for scenario in "Free" "Direct" "Mandatory"; do
-
-for scenario in "Free" "Direct" "Mandatory"; do
-    save_file="$PROJECT_DIR/results/ToolHop/Qwen3-4B/MatchTIR-KM-24-2507-no_kl_no_ent-n_8-step_3200-${scenario}-vllm-4096.jsonl"
-    LOG_FILE="$PROJECT_DIR/results/ToolHop/Qwen3-4B/eval_toolhop_vllm_${CURRENT_TIME}_${scenario}-MatchTIR-KM-24-2507-no_kl_no_ent-n_8-step_3200.log"
-    python3 $PROJECT_DIR/evaluate/${evaluation_file} \
-        --scenario ${scenario} \
-        --series qwen \
-        --model_path ${model} \
-        --input_file $PROJECT_DIR/data/${file} \
-        --output_file ${save_file} \
-        --enable_thinking \
-        --base_url http://localhost:7899/v1 \
-        --concurrency 128 \
-        --batch_size 1024 \
-        --max_tokens 4096 \
-        --batch_mode async \
-        --engine remote \
-        --start_id 0 \
-        --end_id -1  2>&1 | tee  $LOG_FILE 
-done
-
-vllm_kill
-
-#################################################
-evaluation_file="evaluation_toolhop.py"
-file="toolhop/ToolHop.jsonl"
-model="/share/home/sxjiang/myproject/LHTIR/checkpoints/merged_checkpoints/qwen3-4b-2507_ftrl_multiturn-no_ent_no_kl-step_2048-aspo_loss-n_8-MATCHTIR_KM-24"
-vllm_run $model
-# for scenario in "Free" "Direct" "Mandatory"; do
-
-for scenario in "Free" "Direct" "Mandatory"; do
-    save_file="$PROJECT_DIR/results/ToolHop/Qwen3-4B/MatchTIR-KM-24-2507-no_ent_no_kl-n_8-step_2048-aspo_loss-clip_02-${scenario}-vllm-4096.jsonl"
-    LOG_FILE="$PROJECT_DIR/results/ToolHop/Qwen3-4B/eval_toolhop_vllm_${CURRENT_TIME}_${scenario}-MatchTIR-KM-24-2507-no_ent_no_kl-n_8-step_2048-aspo_loss-clip_02.log"
-    python3 $PROJECT_DIR/evaluate/${evaluation_file} \
-        --scenario ${scenario} \
-        --series qwen \
-        --model_path ${model} \
-        --input_file $PROJECT_DIR/data/${file} \
-        --output_file ${save_file} \
-        --enable_thinking \
-        --base_url http://localhost:7899/v1 \
-        --concurrency 128 \
-        --batch_size 1024 \
-        --max_tokens 4096 \
-        --batch_mode async \
-        --engine remote \
-        --start_id 0 \
-        --end_id -1  2>&1 | tee  $LOG_FILE 
-done
-
-vllm_kill
-
-#################################################
-evaluation_file="evaluation_toolhop.py"
-file="toolhop/ToolHop.jsonl"
-model="/share/home/sxjiang/myproject/LHTIR/checkpoints/merged_checkpoints/qwen3-4b-2507_ftrl_multiturn-no_ent_no_kl-step_2048-aspo_loss-2-clip_04-n_8-MATCHTIR_KM-24"
-vllm_run $model
-# for scenario in "Free" "Direct" "Mandatory"; do
-
-for scenario in "Free" "Direct" "Mandatory"; do
-    save_file="$PROJECT_DIR/results/ToolHop/Qwen3-4B/MatchTIR-KM-24-2507-no_ent_no_kl-n_8-step_2048-aspo_loss-2-clip_04-${scenario}-vllm-4096.jsonl"
-    LOG_FILE="$PROJECT_DIR/results/ToolHop/Qwen3-4B/eval_toolhop_vllm_${CURRENT_TIME}_${scenario}-MatchTIR-KM-24-2507-no_ent_no_kl-n_8-step_2048-aspo_loss-2-clip_04.log"
-    python3 $PROJECT_DIR/evaluate/${evaluation_file} \
-        --scenario ${scenario} \
-        --series qwen \
-        --model_path ${model} \
-        --input_file $PROJECT_DIR/data/${file} \
-        --output_file ${save_file} \
-        --enable_thinking \
-        --base_url http://localhost:7899/v1 \
-        --concurrency 128 \
-        --batch_size 1024 \
-        --max_tokens 4096 \
-        --batch_mode async \
-        --engine remote \
-        --start_id 0 \
-        --end_id -1  2>&1 | tee  $LOG_FILE 
-done
-
-vllm_kill
-
-
 
 exit 0

@@ -85,11 +85,11 @@ trap cleanup INT TERM EXIT # 移除了 EXIT，因为正常结束我们手动杀
 
 
 # MODEL_PATH="/share/home/sxjiang/myproject/LHTIR/checkpoints/merged_checkpoints/qwen3-4b-instruct-2507_ftrl_multiturn-no_kl_no_ent-n_8-mask_func-MATCHTIR_KM-24"
-MODEL_PATH="/share/home/sxjiang/myproject/LHTIR/checkpoints/merged_checkpoints/qwen3-4b-2507_ftrl_multiturn-entropy_0_01-no_kl-step_2048-n_8-MATCHTIR_KM-24"
+MODEL_PATH="/share/home/sxjiang/myproject/LHTIR/checkpoints/merged_checkpoints/qwen3-4b-2507_ftrl_multiturn-no_kl_no_ent-n_8-step_2048-gtpo_loss-clip_low3e-3_high4e-3_seq_mean_turn_mean_token_mean-process_reward-MATCHTIR_KM-24"
 export REMOTE_OPENAI_TOKENIZER_PATH=$MODEL_PATH
 MODEL_NAME="Qwen/Qwen3-4B-FC"
 TEST_CATEGORY="multi_turn"
-RESULT_DIR="$PROJECT_DIR/results/BFCL/Qwen3-4B/MatchTIR-KM-24-2507-entropy_0_01-no_kl-n_8-step_2048-vllm_fc"
+RESULT_DIR="$PROJECT_DIR/results/BFCL/Qwen3-4B/MatchTIR-KM-24-2507-no_kl_no_ent-n_8-step_2048-gtpo_loss-clip_low3e-3_high4e-3_seq_mean_turn_mean_token_mean-process_reward-vllm_fc"
 vllm_run $MODEL_PATH
 conda activate BFCL
 
@@ -113,106 +113,6 @@ bfcl evaluate \
   --test-category $TEST_CATEGORY \
   --result-dir $RESULT_DIR \
   --score-dir $RESULT_DIR/scores 2>&1 | tee -a $LOG_FILE
-
-vllm_kill
-
-############################
-MODEL_PATH="/share/home/sxjiang/myproject/LHTIR/checkpoints/merged_checkpoints/qwen3-4b-2507_ftrl_multiturn-no_kl_no_ent-n_8-step_3200-MATCHTIR_KM-24"
-export REMOTE_OPENAI_TOKENIZER_PATH=$MODEL_PATH
-MODEL_NAME="Qwen/Qwen3-4B-FC"
-TEST_CATEGORY="multi_turn"
-RESULT_DIR="$PROJECT_DIR/results/BFCL/Qwen3-4B/MatchTIR-KM-24-2507-no_kl_no_ent-n_8-step_3200-vllm_fc"
-vllm_run $MODEL_PATH
-conda activate BFCL
-
-
-now() {
-    date '+%Y-%m-%d_%H-%M-%S'
-}
-TIMESTAMP=$(now)
-mkdir -p $RESULT_DIR
-LOG_FILE="$RESULT_DIR/bfcl_eval_${TIMESTAMP}.log"
-echo "MODEL_PATH: $MODEL_PATH" | tee $LOG_FILE
-bfcl generate \
-  --model $MODEL_NAME \
-  --test-category $TEST_CATEGORY \
-  --skip-server-setup \
-  --num-threads 64\
-  --result-dir $RESULT_DIR 2>&1 | tee -a $LOG_FILE
-
-bfcl evaluate \
-  --model $MODEL_NAME \
-  --test-category $TEST_CATEGORY \
-  --result-dir $RESULT_DIR \
-  --score-dir $RESULT_DIR/scores 2>&1 | tee -a $LOG_FILE
-
-
-
-vllm_kill
-
-#################################
-MODEL_PATH="/share/home/sxjiang/myproject/LHTIR/checkpoints/merged_checkpoints/qwen3-4b-2507_ftrl_multiturn-no_ent_no_kl-step_2048-aspo_loss-n_8-MATCHTIR_KM-24"
-export REMOTE_OPENAI_TOKENIZER_PATH=$MODEL_PATH
-MODEL_NAME="Qwen/Qwen3-4B-FC"
-TEST_CATEGORY="multi_turn"
-RESULT_DIR="$PROJECT_DIR/results/BFCL/Qwen3-4B/MatchTIR-KM-24-2507-no_ent_no_kl-n_8-step_2048-aspo_loss-clip_02-vllm_fc"
-vllm_run $MODEL_PATH
-conda activate BFCL
-
-
-now() {
-    date '+%Y-%m-%d_%H-%M-%S'
-}
-TIMESTAMP=$(now)
-mkdir -p $RESULT_DIR
-LOG_FILE="$RESULT_DIR/bfcl_eval_${TIMESTAMP}.log"
-echo "MODEL_PATH: $MODEL_PATH" | tee $LOG_FILE
-bfcl generate \
-  --model $MODEL_NAME \
-  --test-category $TEST_CATEGORY \
-  --skip-server-setup \
-  --num-threads 32\
-  --result-dir $RESULT_DIR 2>&1 | tee -a $LOG_FILE
-
-bfcl evaluate \
-  --model $MODEL_NAME \
-  --test-category $TEST_CATEGORY \
-  --result-dir $RESULT_DIR \
-  --score-dir $RESULT_DIR/scores 2>&1 | tee -a $LOG_FILE
-
-
-vllm_kill
-
-##################################
-MODEL_PATH="/share/home/sxjiang/myproject/LHTIR/checkpoints/merged_checkpoints/qwen3-4b-2507_ftrl_multiturn-no_ent_no_kl-step_2048-aspo_loss-2-clip_04-n_8-MATCHTIR_KM-24"
-export REMOTE_OPENAI_TOKENIZER_PATH=$MODEL_PATH
-MODEL_NAME="Qwen/Qwen3-4B-FC"
-TEST_CATEGORY="multi_turn"
-RESULT_DIR="$PROJECT_DIR/results/BFCL/Qwen3-4B/MatchTIR-KM-24-2507-no_ent_no_kl-n_8-step_2048-aspo_loss-2-clip_04-vllm_fc"
-vllm_run $MODEL_PATH
-conda activate BFCL
-
-
-now() {
-    date '+%Y-%m-%d_%H-%M-%S'
-}
-TIMESTAMP=$(now)
-mkdir -p $RESULT_DIR
-LOG_FILE="$RESULT_DIR/bfcl_eval_${TIMESTAMP}.log"
-echo "MODEL_PATH: $MODEL_PATH" | tee $LOG_FILE
-bfcl generate \
-  --model $MODEL_NAME \
-  --test-category $TEST_CATEGORY \
-  --skip-server-setup \
-  --num-threads 32\
-  --result-dir $RESULT_DIR 2>&1 | tee -a $LOG_FILE
-
-bfcl evaluate \
-  --model $MODEL_NAME \
-  --test-category $TEST_CATEGORY \
-  --result-dir $RESULT_DIR \
-  --score-dir $RESULT_DIR/scores 2>&1 | tee -a $LOG_FILE
-
 
 vllm_kill
 
