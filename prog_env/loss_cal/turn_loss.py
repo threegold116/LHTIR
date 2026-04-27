@@ -87,6 +87,9 @@ def compute_policy_loss_gtpo(
     else:
         prompt_lengths = [0 for _ in range(bsz)]
 
+    # 记录每个样本的turns
+    turns_list = []
+    
     for i in range(bsz):
         if attention_mask is not None:
             prompt_len = prompt_lengths[i]
@@ -111,12 +114,12 @@ def compute_policy_loss_gtpo(
                 start = None
         if start is not None:
             turns.append((start, valid_length - 1))
-
         # 在每个 turn 内计算 mean(delta log-prob)，并广播回 turn 内 token。
         for s, e in turns:
             turn_kl_mean = negative_approx_kl[i, s : e + 1].mean()
             token_turn_mean_kl[i, s : e + 1] = turn_kl_mean
-
+        turns_list.append(turns)
+        
     # stop-gradient 设计：
     # - 数值上使用 turn 聚合后的 log-ratio；
     # - 梯度路径仍来自 token-level log_prob，保持与现有 token loss 兼容。
@@ -132,7 +135,7 @@ def compute_policy_loss_gtpo(
     if rollout_is_weights is not None:
         pg_losses = pg_losses * rollout_is_weights
 
-    pg_loss = agg_loss(loss_mat=pg_losses, loss_mask=response_mask, loss_agg_mode=loss_agg_mode)
+    pg_loss = agg_loss(loss_mat=pg_losses, loss_mask=response_mask, loss_agg_mode=loss_agg_mode, turns_list=turns_list)
 
     pg_clipfrac = verl_F.masked_mean(torch.gt(pg_losses2, pg_losses1).float(), response_mask)
     ppo_kl = verl_F.masked_mean(-negative_approx_kl, response_mask)

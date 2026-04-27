@@ -528,13 +528,18 @@ class RayPPOTrainer:
                     == 0
                 )
                 assert config.actor_rollout_ref.actor.ppo_micro_batch_size * sp_size >= n_gpus
-
+        #--------THREEGOLDCHANGE--------#
+        '''
+        1.新增turn-level loss aggregation mode
+        '''
         assert config.actor_rollout_ref.actor.loss_agg_mode in [
             "token-mean",
             "seq-mean-token-sum",
             "seq-mean-token-mean",
             "seq-mean-token-sum-norm",
+            "seq-mean-turn-mean-token-mean",
         ], f"Invalid loss_agg_mode: {config.actor_rollout_ref.actor.loss_agg_mode}"
+        #--------THREEGOLDCHANGE--------#
 
         if self.config.algorithm.use_kl_in_reward and config.actor_rollout_ref.actor.use_kl_loss:
             print("NOTICE: You have both enabled in-reward kl and kl loss.")

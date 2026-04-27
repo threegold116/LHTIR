@@ -695,7 +695,7 @@ def compute_rewards(token_level_scores, old_log_prob, ref_log_prob, kl_ratio):
     return token_level_scores - kl * kl_ratio
 
 
-def agg_loss(loss_mat: torch.Tensor, loss_mask: torch.Tensor, loss_agg_mode: str):
+def agg_loss(loss_mat: torch.Tensor, loss_mask: torch.Tensor, loss_agg_mode: str, turns_list: list=None):
     """
     Aggregate the loss matrix into a scalar.
 
@@ -706,10 +706,20 @@ def agg_loss(loss_mat: torch.Tensor, loss_mask: torch.Tensor, loss_agg_mode: str
             shape: (bs, response_length)
         loss_agg_mode: (str) choices:
             method to aggregate the loss matrix into a scalar.
+        turns_list: `(list)`:
+            list of turns, each turn is a tuple of (start, end)
     Returns:
         loss: `a scalar torch.Tensor`
             aggregated loss
     """
+    #--------THREEGOLDCHANGE--------#
+    '''
+    1.新增turn-level loss aggregation mode
+    2.如果turns_list为None，则不使用turn-level loss aggregation mode
+    '''
+    if turns_list is None and loss_agg_mode == "seq-mean-turn-mean-token-mean":
+        loss_agg_mode = "seq-mean-token-mean"
+    #--------THREEGOLDCHANGE--------#
     if loss_agg_mode == "token-mean":
         loss = verl_F.masked_mean(loss_mat, loss_mask)
     elif loss_agg_mode == "seq-mean-token-sum":
@@ -725,6 +735,17 @@ def agg_loss(loss_mat: torch.Tensor, loss_mask: torch.Tensor, loss_agg_mode: str
         # throughout training to well-replicate the DrGRPO paper.
         # TODO: Perhaps add user-defined normalizer argument to
         # agg_loss to ensure divisor stays constant throughout.
+    #--------THREEGOLDCHANGE--------#
+    elif loss_agg_mode == "seq-mean-turn-mean-token-mean":
+        seq_losses = []
+        for i in range(len(turns_list)):
+            turns = turns_list[i]
+            turn_losses = []
+            for s, e in turns:
+                turn_losses.append(loss_mat[i, s : e + 1].mean())
+            seq_losses.append(torch.mean(torch.stack(turn_losses)))
+        loss = torch.mean(torch.stack(seq_losses))
+    #--------THREEGOLDCHANGE--------#
     else:
         raise ValueError(f"Invalid loss_agg_mode: {loss_agg_mode}")
 
