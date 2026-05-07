@@ -60,6 +60,8 @@ class AsyncAgentResponder:
 
 async def run_one_task(task_index: int, args, agent_responder: AsyncAgentResponder, user_responder: AsyncTextResponder) -> dict[str, Any]:
     env = build_env(args.tau_root, args.env, args.task_split, task_index=task_index)
+    from tau_bench.types import Action
+
     user_simulator = TauBenchUserSimulator(user_responder)
     env.user = user_simulator
     env.task_index = task_index
@@ -83,7 +85,7 @@ async def run_one_task(task_index: int, args, agent_responder: AsyncAgentRespond
 
         action = action_from_assistant_message(
             assistant_message,
-            action_cls=type(env.task.actions[0]),
+            action_cls=Action,
             respond_action_name="respond",
         )
         env.actions.append(action)

@@ -19,7 +19,8 @@
 #--------THREEGOLDCHANGE--------#
 from .agent_loop import AgentLoopBase, AgentLoopManager
 from .tool_agent_loop import ToolAgentLoop
+from .tool_agent_loop_2 import ToolAgentLoop_2
 
-_ = [ToolAgentLoop]
+_ = [ToolAgentLoop, ToolAgentLoop_2]
 
 __all__ = ["AgentLoopBase", "AgentLoopManager"]

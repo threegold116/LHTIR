@@ -31,6 +31,7 @@ mkdir -p "$DEFAULT_LOCAL_DIR"
 LOG_FILE="$DEFAULT_LOCAL_DIR/$TIMESTAMP.log"
 MODEL="/share/home/sxjiang/model/Qwen3-4B-Thinking-2507"
 
+export AGENT_NAME="tool_agent_2"
 python3 -m verl.trainer.main_ppo \
     --config-path="$CONFIG_PATH" \
     --config-name='ftrl_multiturn' \

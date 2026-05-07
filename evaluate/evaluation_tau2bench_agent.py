@@ -49,6 +49,8 @@ def load_finished_keys(output_file: str) -> set[tuple[int, str]]:
             if not line.strip():
                 continue
             item = json.loads(line)
+            if item.get("stop_reason") == "error":
+                continue
             keys.add((item["task_index"], item["data_source"]))
     return keys
 
@@ -120,4 +122,3 @@ def main():
 
 if __name__ == "__main__":
     main()
-
