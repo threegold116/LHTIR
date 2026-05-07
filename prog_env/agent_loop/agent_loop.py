@@ -319,6 +319,14 @@ class AgentLoopWorker:
         )
 
         for agent_name, messages, trajectory, tools, codes in zip(agent_names, raw_prompts, trajectory_info, batch_tools, batch_codes, strict=True):
+            #--------THREEGOLDCHANGE--------#
+            '''
+            1.在generate_sequences中增加agent_name的传入:
+            #FIXME:临时利用env_var修改
+            '''
+            agent_name = os.environ.get("AGENT_NAME", agent_name)
+            #--------THREEGOLDCHANGE--------#
+            
             tasks.append(
                 asyncio.create_task(self._run_agent_loop(agent_name, messages.tolist(), sampling_params, trajectory, tools=tools, codes=codes))
             )

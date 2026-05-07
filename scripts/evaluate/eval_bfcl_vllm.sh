@@ -6,7 +6,7 @@ source /share/home/sxjiang/miniconda3/bin/activate
 export LOCAL_SERVER_ENDPOINT=localhost        # 可省略，默认就是 localhost
 export LOCAL_SERVER_PORT=7897                # 可省略，默认就是 1053
 export REMOTE_OPENAI_BASE_URL=http://0.0.0.0:7897/v1
-export CUDA_VISIBLE_DEVICES=0,1,2,3
+export CUDA_VISIBLE_DEVICES=4,5,6,7
 
 PROJECT_DIR="/share/home/sxjiang/myproject/LHTIR"
 LOG_DIR="$PROJECT_DIR/logs/vllm_logs"
@@ -83,13 +83,12 @@ trap cleanup INT TERM EXIT # 移除了 EXIT，因为正常结束我们手动杀
 
 
 
-
-# MODEL_PATH="/share/home/sxjiang/myproject/LHTIR/checkpoints/merged_checkpoints/qwen3-4b-instruct-2507_ftrl_multiturn-no_kl_no_ent-n_8-mask_func-MATCHTIR_KM-24"
-MODEL_PATH="/share/home/sxjiang/myproject/LHTIR/checkpoints/merged_checkpoints/qwen3-4b-2507_ftrl_multiturn-no_kl_no_ent-n_8-step_2048-gtpo_loss-clip_low3e-3_high4e-3_seq_mean_turn_mean_token_mean-process_reward-MATCHTIR_KM-24"
+###########################################################
+MODEL_PATH="/share/home/sxjiang/myproject/LHTIR/checkpoints/merged_checkpoints/qwen3-4b-2507_ftrl_multiturn-no_kl_no_ent-n_8-step_2048-gtpo_loss-clip_low6e-3_high8e-3_seq-mean-turn-mean-token-mean-process_reward-MATCHTIR_KM-24"
 export REMOTE_OPENAI_TOKENIZER_PATH=$MODEL_PATH
 MODEL_NAME="Qwen/Qwen3-4B-FC"
 TEST_CATEGORY="multi_turn"
-RESULT_DIR="$PROJECT_DIR/results/BFCL/Qwen3-4B/MatchTIR-KM-24-2507-no_kl_no_ent-n_8-step_2048-gtpo_loss-clip_low3e-3_high4e-3_seq_mean_turn_mean_token_mean-process_reward-vllm_fc"
+RESULT_DIR="$PROJECT_DIR/results/BFCL/Qwen3-4B/no_kl_no_ent-n_8-step_2048-gtpo_loss-clip_low6e-3_high8e-3_seq-mean-turn-mean-token-mean-process_reward-vllm_fc"
 vllm_run $MODEL_PATH
 conda activate BFCL
 
@@ -115,5 +114,8 @@ bfcl evaluate \
   --score-dir $RESULT_DIR/scores 2>&1 | tee -a $LOG_FILE
 
 vllm_kill
+
+
+exit 0
 
 

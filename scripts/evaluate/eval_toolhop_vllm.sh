@@ -80,17 +80,17 @@ cleanup() {
 trap cleanup INT TERM EXIT # 移除了 EXIT，因为正常结束我们手动杀
 
 
-
+#####################################################################
 evaluation_file="evaluation_toolhop.py"
 file="toolhop/ToolHop.jsonl"
-model="/share/home/sxjiang/myproject/LHTIR/checkpoints/merged_checkpoints/qwen3-4b-2507_ftrl_multiturn-no_kl_no_ent-n_8-step_2048-gtpo_loss-clip_low3e-3_high4e-3_seq_mean_turn_mean_token_mean-process_reward-MATCHTIR_KM-24"
+model="/share/home/sxjiang/myproject/LHTIR/checkpoints/merged_checkpoints/qwen3-4b-2507_ftrl_multiturn-no_kl_no_ent-n_8-step_2048-gtpo_loss-clip_low6e-3_high8e-3_seq-mean-turn-mean-token-mean-process_reward-MATCHTIR_KM-24"
 
 vllm_run $model
 # for scenario in "Free" "Direct" "Mandatory"; do
 
-for scenario in "Free"; do
-    save_file="$PROJECT_DIR/results/ToolHop/Qwen3-4B/MatchTIR-KM-24-2507-no_kl_no_ent-n_8-step_2048-gtpo_loss-clip_low3e-3_high4e-3_seq_mean_turn_mean_token_mean-process_reward-seed1-2-${scenario}-vllm-4096.jsonl"
-    LOG_FILE="$PROJECT_DIR/results/ToolHop/Qwen3-4B/eval_toolhop_vllm_${CURRENT_TIME}_${scenario}-MatchTIR-KM-24-2507-no_kl_no_ent-n_8-step_2048-gtpo_loss-clip_low3e-3_high4e-3_seq_mean_turn_mean_token_mean-process_reward-seed1-2.log"
+for scenario in "Free" "Direct" "Mandatory"; do
+    save_file="$PROJECT_DIR/results/ToolHop/Qwen3-4B/MatchTIR-KM-24-2507-no_kl_no_ent-n_8-step_2048-gtpo_loss-clip_low6e-3_high8e-3_seq-mean-turn-mean-token-mean-process_reward-${scenario}-vllm-4096.jsonl"
+    LOG_FILE="$PROJECT_DIR/results/ToolHop/Qwen3-4B/eval_toolhop_vllm_${CURRENT_TIME}_${scenario}-MatchTIR-KM-24-2507-no_kl_no_ent-n_8-step_2048-gtpo_loss-clip_low6e-3_high8e-3_seq-mean-turn-mean-token-mean-process_reward.log"
     python3 $PROJECT_DIR/evaluate/${evaluation_file} \
         --scenario ${scenario} \
         --series qwen \
@@ -109,5 +109,6 @@ for scenario in "Free"; do
 done
 
 vllm_kill
+
 
 exit 0

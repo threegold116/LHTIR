@@ -132,8 +132,8 @@ def get_feedback(tool_calls: list[FunctionCall], codes: list[dict[str, Any]], **
 
     return res
 
-@register("tool_agent")
-class ToolAgentLoop(AgentLoopBase):
+@register("tool_agent_2")
+class ToolAgentLoop_2(AgentLoopBase):
     @classmethod
     def init_class(cls, config, tokenizer, **kwargs):
         if cls._class_initialized:
@@ -171,14 +171,7 @@ class ToolAgentLoop(AgentLoopBase):
         cls.max_step_length = config.actor_rollout_ref.rollout.multi_turn.get("max_step_length", cls.response_length)
         cls.enable_overlong_mask = config.actor_rollout_ref.rollout.multi_turn.get("enable_overlong_mask", False)
         cls.overlong_mask_scope = config.actor_rollout_ref.rollout.multi_turn.get("overlong_mask_scope", "trajectory")
-        cls.overlong_mask_require_unfinished_toolcall = config.actor_rollout_ref.rollout.multi_turn.get(
-            "overlong_mask_require_unfinished_toolcall",
-            True,
-        )
-        cls.overlong_mask_require_void_turn = config.actor_rollout_ref.rollout.multi_turn.get(
-            "overlong_mask_require_void_turn",
-            False,
-        )
+
         cls.system_prompt = tokenizer.apply_chat_template([{}], add_generation_prompt=False, tokenize=True)
 
     @rollout_trace_op
@@ -258,11 +251,14 @@ class ToolAgentLoop(AgentLoopBase):
                 step_complete_list.append(False)
                 stop_reason = "response_length_limit"
                 break
-
+            #FIXME:通过最后一个token是否为eos来判断是否正常输出这个turn
             # no tool calls means the assistant turn finishes normally (final answer / stop)
             if not tool_calls:
                 step_complete_list.append(True)
-                stop_reason = "no_tool_call_end"
+                if response_ids[-1] == self.tokenizer.eos_token_id:
+                    stop_reason = "answer_normally"
+                else:
+                    stop_reason = "trunctated_step"
                 break
 
             # reach max assistant turns
@@ -320,14 +316,11 @@ class ToolAgentLoop(AgentLoopBase):
             "assistant_turn_limit",
             "user_turn_limit",
             "tool_response_overflow",
+            "trunctated_step"
         }
-        no_final_answer = (
-            overturn if self.overlong_mask_require_unfinished_toolcall else True
-        )
-        void_turn_ok = has_void_turn if self.overlong_mask_require_void_turn else True
-        overlong_hit = overlong_limit_reached and no_final_answer and void_turn_ok
+
         overlong_mask_applied = False
-        if self.enable_overlong_mask and overlong_hit:
+        if self.enable_overlong_mask and overlong_limit_reached:
             if self.overlong_mask_scope == "trajectory":
                 response_mask = [0] * len(response_mask)
                 overlong_mask_applied = True
@@ -348,7 +341,7 @@ class ToolAgentLoop(AgentLoopBase):
         logger.error(
             f"instance_id finished: {local_instance_id}, response_length: {len(response_mask)}, "
             f"assistant_turns: {assistant_turns}, stop_reason: {stop_reason}, "
-            f"overturn: {overturn}, overlong_hit: {overlong_hit}, "
+            f"overturn: {overturn}"
             f"overlong_mask_applied: {overlong_mask_applied}, has_void_turn: {has_void_turn}, "
             f"step_complete_list: {step_complete_list}, step_length_list: {step_length_list}, "
             f"cost_time_list: {cost_time_list}, total_cost_time: {time.time() - t1}"
@@ -359,13 +352,12 @@ class ToolAgentLoop(AgentLoopBase):
         '''
         if step_length_list:
             metrics["step_length"] = list(step_length_list)
-        metrics["overlong_hit"] = float(overlong_hit)
-        metrics["overlong_mask_applied"] = float(overlong_mask_applied)
-        metrics["overturn"] = float(overturn)
-        metrics["stop_reason"] = stop_reason
-        metrics["step_complete"] = [float(x) for x in step_complete_list]
-        metrics["void_turn"] = [float(x) for x in void_turn_list]
-        metrics["has_void_turn"] = float(has_void_turn)
+        # metrics["overlong_mask_applied"] = float(overlong_mask_applied)
+        # metrics["overturn"] = float(overturn)
+        # metrics["stop_reason"] = stop_reason
+        # metrics["step_complete"] = [float(x) for x in step_complete_list]
+        # metrics["void_turn"] = [float(x) for x in void_turn_list]
+        # metrics["has_void_turn"] = float(has_void_turn)
         #--------THREEGOLDCHANGE--------#
         response_ids = prompt_ids[-len(response_mask) :] #裁剪prompt_ids得到response_ids
         prompt_ids = prompt_ids[: len(prompt_ids) - len(response_mask)] #裁剪response_ids得到prompt_ids

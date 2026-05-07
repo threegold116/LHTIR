@@ -269,6 +269,7 @@ def compute_grpo_mathtir_fast_outcome_advantage(
         #--------THREEGOLDCHANGE--------#
         '''
         新增:计算vaild_length
+        如果vaild_length为0，则不计算turn_rewards_list(避免stack错误)
         '''
         prompt_length = prompts[i].shape[-1]
         vaild_length = attention_mask[i][prompt_length:].sum(-1)
@@ -372,7 +373,7 @@ def compute_grpo_mathtir_fast_outcome_advantage(
 
     for i in range(bsz):
         turns = turns_list[i]
-        step_adv = discounted_adv_list[i]         
+        step_adv = discounted_adv_list[i]
         fused_adv = (group_adv[i] + step_adv) / 2 
 
         for j, (s, e) in enumerate(turns):
@@ -566,6 +567,11 @@ def compute_grpo_mathtir_fast_reverse_outcome_advantage(
         '''
         prompt_length = prompts[i].shape[-1]
         vaild_length = attention_mask[i][prompt_length:].sum(-1)
+        if torch.sum(mask)==0:
+            # 如果vaild_length为0，则不计算turn_rewards_list(避免stack错误)
+            turns_list.append([])
+            turn_rewards_list.append(torch.empty(0, device=token_level_rewards.device, dtype=token_level_rewards.dtype))
+            continue
         #--------THREEGOLDCHANGE--------#
         rewards = token_level_rewards[i]
 
@@ -723,6 +729,8 @@ def compute_grpo_mathtir_fast_reverse_outcome_advantage(
 
     for i in range(bsz):
         turns = turns_list[i]
+        if len(turns) == 0:
+            continue
         step_adv = discounted_adv_list[i]         
         fused_adv = (group_adv[i] + step_adv) / 2 
 
