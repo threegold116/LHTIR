@@ -504,8 +504,18 @@ def compute_grpo_mathtir_fast_reverse_outcome_advantage(
     """
     if "4" in os.environ.get("RAY_DEBUG_MODE","0"):
         breakpoint()
-    scores = token_level_rewards.sum(dim=-1)
     config = kwargs.get("config", {})
+    scores = token_level_rewards.sum(dim=-1) #计算sequence-level的reward, (bs,)
+    #------THREEGOLDCHANGE--------#
+    answer_index = kwargs.get("answer_index", []) #(bs,)
+    bsz = scores.shape[0]
+    if config.get("trajectory_mode", "sum") == "outcome" and len(answer_index)==bsz:#只有outcome的reward，剔除process的reward
+        for i in range(bsz):
+            if answer_index[i] != -1:
+                scores[i] = token_level_rewards[i, answer_index[i]]
+            else:
+                scores[i] = 0.0
+    #------THREEGOLDCHANGE--------#
     id2score = defaultdict(list)
     id2mean = {}
     id2std = {}
@@ -694,9 +704,14 @@ def compute_grpo_mathtir_fast_reverse_outcome_advantage(
                 adv_turn[j] = disc[j] - step_mean[key]
         discounted_adv_list.append(adv_turn)
     num2count = defaultdict(int)
+    print_count = 10
     for key in step_key2score:
         num2count[len(step_key2score[key])] += 1
+        if len(step_key2score[key]) <= 1 and print_count > 0:
+            logger.error(f"step_key2score: {key}, {step_key2score[key]}")
+            print_count -= 1
     logger.error(f"step group num2count: {sorted(num2count.items(),key=lambda x: x[1])}")
+    logger.error(f"sample num")
     #--------THREEGOLDCHANGE--------#
     '''
     6.新增打印部分:logger.error打印discounted_adv_list的结束时间

@@ -291,6 +291,7 @@ def compute_advantage(
             "response_mask": data.batch["response_mask"],
             "attention_mask": data.batch["attention_mask"],
             "prompts": data.batch["prompts"],
+            "answer_index": data.non_tensor_batch.get("answer_index", []),
             "config": config,
         }
         #--------THREEGOLDCHANGE--------#
