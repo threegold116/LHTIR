@@ -15,7 +15,7 @@
  """
 
 from prog_env.utils.utils import answer_verify, get_feedback
-from prog_env.utils.parse_output import parse_qwen
+from prog_env.utils.parse_output import parse_qwen, parse_qwen_prog
 import re
 import json
 import os
@@ -629,6 +629,111 @@ def compute_process_KM(response: str, codes: dict, unsolved_set: dict, solve_rat
         return scores
     elif split == "test":  
         return compute_solve_f1(response, codes, unsolved_set, solve_rate, split, answer, gt_tool_call, tokenizer, valid_response_ids)
+
+#--------THREEGOLDCHANGE--------#
+'''
+1.新增compute_process_KM_prog_hermes
+相比于compute_process_KM,compute_process_KM_prog_hermes主要区别在于:
+- 支持hermes_prog工具解析器
+- 支持think_mode
+'''
+def compute_process_KM_prog_hermes(response: str, codes: dict, unsolved_set: dict, solve_rate: float, split: str, answer: str = None, gt_tool_call: list = None, tokenizer=None, valid_response_ids=None):
+    if split == "train":
+        if "7" in os.environ.get("RAY_DEBUG_MODE","0"):
+            breakpoint()
+        if isinstance(gt_tool_call, str):
+            gt_tool_call = json.loads(gt_tool_call)
+        scores = [0.0] * len(valid_response_ids)
+       
+        search_start = 0
+        if "<think>" in response:
+            think_mode = True
+        else:
+            think_mode = False
+        chats = response.split("\n<|im_start|>assistant\n")
+        chats_size = len(chats)
+        
+        process_reward = [0.0] * chats_size
+        count_per_turn = [0] * chats_size
+
+        tool_call_list = []
+        tool_to_turn_index = []
+        for i, chat in enumerate(chats):
+            #--------THREEGOLDCHANGE--------#
+            '''
+            1.如果是hermes_prog，则需要去掉<|endoftext|>
+            '''
+            chat = chat.strip().removesuffix('<|endoftext|>').strip()
+            
+            # chat = chat.strip().removesuffix('<|endoftext|>').strip().removesuffix('<|im_end|>').strip()
+            #--------THREEGOLDCHANGE--------#
+            answer_match = re.search(r'<answer>(.*?)</answer>', chat, re.DOTALL)
+            if not answer_match:
+                parsed_response = parse_qwen_prog(chat, think_mode=think_mode)
+                pd_tools = parsed_response.get("tool_calls") or []
+                if len(pd_tools) > 0:
+                    for j, pd_tool in enumerate(pd_tools):
+                        tool_call_list.append(pd_tool["function"])
+                        tool_to_turn_index.append(i)
+            else :
+                answer_score = 0.0
+                pd_answer = answer_match.group(1).strip()
+                pd_answer = preprocess_text(pd_answer)
+                
+                gt_answer = preprocess_text(answer)
+
+                pred_tokens = set(pd_answer.split())
+                gt_tokens = set(gt_answer.split())
+
+                common_tokens = pred_tokens & gt_tokens
+
+                precision = len(common_tokens) / len(pred_tokens) if pred_tokens else 0
+                recall = len(common_tokens) / len(gt_tokens) if gt_tokens else 0
+
+                if precision + recall > 0: 
+                    f1 = 2 * (precision * recall) / (precision + recall)
+                    answer_score += f1
+                process_reward[i] = answer_score
+
+        tool_call_reward = assign_rewards_hungarian(tool_call_list, gt_tool_call, unmatched_penalty=0)
+
+        for reward, turn_idx in zip(tool_call_reward, tool_to_turn_index):
+            process_reward[turn_idx] += reward
+            count_per_turn[turn_idx] += 1
+
+        for i in range(chats_size):
+            if count_per_turn[i] > 0:
+                process_reward[i] /= count_per_turn[i]
+        sep_str = "\n<|im_start|>assistant\n"
+        sep_ids = tokenizer.encode(sep_str, add_special_tokens=False)
+
+        start_positions = [0]
+
+        start_positions += find_all_subsequence(valid_response_ids, sep_ids)
+
+        end_str = "<|im_end|>"
+        end_ids = tokenizer.encode(end_str, add_special_tokens=False)
+ 
+        turns = []
+        for s in start_positions:
+            rel_pos = find_all_subsequence(valid_response_ids[s:], end_ids)
+            
+            if len(rel_pos) == 0:
+                e = len(valid_response_ids)
+            else:
+                e = s + rel_pos[0] + len(end_ids)
+
+            turns.append((s, e))
+
+        for i, turn in enumerate(turns): #turn-level reward
+            start, end = turn
+            scores[start:end] = [0.0] * (end - start)
+            scores[end - 1] = process_reward[i]
+
+        return scores
+    elif split == "test":  
+        return compute_solve_f1(response, codes, unsolved_set, solve_rate, split, answer, gt_tool_call, tokenizer, valid_response_ids)
+
 
 #------THREEGOLDCHANGE--------#
 '''

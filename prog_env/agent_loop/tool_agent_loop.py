@@ -172,7 +172,7 @@ class ToolAgentLoop(AgentLoopBase):
         cls.system_prompt = tokenizer.apply_chat_template([{}], add_generation_prompt=False, tokenize=True)
 
     @rollout_trace_op
-    async def run(self, messages: list[dict[str, Any]], sampling_params: dict[str, Any], tools: list[dict[str, Any]], codes: list[dict[str, Any]]) -> AgentLoopOutput:
+    async def run(self, messages: list[dict[str, Any]], sampling_params: dict[str, Any], tools: list[dict[str, Any]], codes: list[dict[str, Any]], global_step: int = -1) -> AgentLoopOutput:
         global instance_id
         metrics = {}
         request_id = uuid4().hex
@@ -201,6 +201,18 @@ class ToolAgentLoop(AgentLoopBase):
         #--------THREEGOLDCHANGE--------#
         response_mask = []
         user_turns, assistant_turns = 0, 0
+        
+        #--------THREEGOLDCHANGE--------#
+        '''
+        1.新增think_mode的控制逻辑
+        只有当tool_parser是hermes_prog时think_mode才会起作用,默认的情况下think_mode为False
+        '''
+        if "<think>" in self.tokenizer.decode(prompt_ids):
+            self.tool_parser.think_mode = True
+        else:
+            self.tool_parser.think_mode = False
+        #--------THREEGOLDCHANGE--------#
+        
         while True:
             #--------THREEGOLDCHANGE--------#
             '''

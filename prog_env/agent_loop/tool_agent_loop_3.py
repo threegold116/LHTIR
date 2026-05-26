@@ -132,8 +132,8 @@ def get_feedback(tool_calls: list[FunctionCall], codes: list[dict[str, Any]], **
 
     return res
 
-@register("tool_agent_2")
-class ToolAgentLoop_2(AgentLoopBase):
+@register("tool_agent_3")
+class ToolAgentLoop_3(AgentLoopBase):
     @classmethod
     def init_class(cls, config, tokenizer, **kwargs):
         if cls._class_initialized:
@@ -171,14 +171,73 @@ class ToolAgentLoop_2(AgentLoopBase):
         cls.max_step_length = config.actor_rollout_ref.rollout.multi_turn.get("max_step_length", cls.response_length)
         cls.enable_overlong_mask = config.actor_rollout_ref.rollout.multi_turn.get("enable_overlong_mask", False)
         cls.overlong_mask_scope = config.actor_rollout_ref.rollout.multi_turn.get("overlong_mask_scope", "trajectory")
+        progressive_turns = config.actor_rollout_ref.rollout.multi_turn.get("progressive_turns", {})
+        cls.progressive_turns_enabled = config.actor_rollout_ref.rollout.multi_turn.get(
+            "progressive_turns_enabled", progressive_turns.get("enable", False)
+        )
+        cls.progressive_start_turns = config.actor_rollout_ref.rollout.multi_turn.get(
+            "progressive_start_turns", progressive_turns.get("start_turns", 1)
+        )
+        cls.progressive_end_turns = config.actor_rollout_ref.rollout.multi_turn.get(
+            "progressive_end_turns", progressive_turns.get("end_turns", cls.max_assistant_turns)
+        )
+        cls.progressive_turn_scale_step = config.actor_rollout_ref.rollout.multi_turn.get(
+            "progressive_turn_scale_step", progressive_turns.get("turn_scale_step", 100)
+        )
+        cls.progressive_turn_scale_delta = config.actor_rollout_ref.rollout.multi_turn.get(
+            "progressive_turn_scale_delta", progressive_turns.get("turn_scale_delta", 1)
+        )
+        cls.progressive_sync_user_turns = config.actor_rollout_ref.rollout.multi_turn.get(
+            "progressive_sync_user_turns", progressive_turns.get("sync_user_turns", True)
+        )
 
         cls.system_prompt = tokenizer.apply_chat_template([{}], add_generation_prompt=False, tokenize=True)
 
+    @classmethod
+    def _get_effective_turn_limits(cls, global_step: int = -1) -> tuple[int | None, int | None]:
+        if not cls.progressive_turns_enabled:
+            return cls.max_assistant_turns, cls.max_user_turns
+
+        start_turns = max(int(cls.progressive_start_turns), 0)
+        turn_scale_step = int(cls.progressive_turn_scale_step)
+        turn_scale_delta = max(int(cls.progressive_turn_scale_delta), 0)
+
+        if turn_scale_step > 0:
+            # global_step starts from 1 in trainer; convert to zero-based for scaling buckets.
+            num_scales = max(int(global_step) - 1, 0) // turn_scale_step
+            effective_turns = start_turns + num_scales * turn_scale_delta
+        else:
+            effective_turns = start_turns
+
+        if cls.progressive_end_turns is not None:
+            effective_turns = min(effective_turns, int(cls.progressive_end_turns))
+        if cls.max_assistant_turns is not None:
+            effective_turns = min(effective_turns, int(cls.max_assistant_turns))
+
+        effective_max_user_turns = effective_turns if cls.progressive_sync_user_turns else cls.max_user_turns
+        return effective_turns, effective_max_user_turns
+
     @rollout_trace_op
-    async def run(self, messages: list[dict[str, Any]], sampling_params: dict[str, Any], tools: list[dict[str, Any]], codes: list[dict[str, Any]], global_step: int = -1) -> AgentLoopOutput:
+    async def run(
+        self,
+        messages: list[dict[str, Any]],
+        sampling_params: dict[str, Any],
+        tools: list[dict[str, Any]],
+        codes: list[dict[str, Any]],
+        global_step: int = -1,
+    ) -> AgentLoopOutput:
         global instance_id
         metrics = {}
         request_id = uuid4().hex
+        effective_max_assistant_turns, effective_max_user_turns = self._get_effective_turn_limits(global_step)
+        metrics["progressive_turns_enabled"] = bool(self.progressive_turns_enabled)
+        metrics["progressive_global_step"] = int(global_step)
+        metrics["progressive_effective_assistant_turns"] = (
+            -1 if effective_max_assistant_turns is None else int(effective_max_assistant_turns)
+        )
+        metrics["progressive_effective_user_turns"] = (
+            -1 if effective_max_user_turns is None else int(effective_max_user_turns)
+        )
         #--------THREEGOLDCHANGE--------#
         '''
         1.tools从instance中获取:原始是通过tool_config_path获取的的tool_schemas,现在是直接通过data中的tools获取的
@@ -197,7 +256,13 @@ class ToolAgentLoop_2(AgentLoopBase):
             ),#TODO:加上enable_thinking的逻辑,默认就是添加的
         )
         instance_id += 1
-        logger.error(f"request_id: {request_id}, instance_id: {instance_id}")
+        logger.error(
+            f"request_id: {request_id}, instance_id: {instance_id}, "
+            f"progressive_turns_enabled: {self.progressive_turns_enabled}, "
+            f"global_step: {global_step}, "
+            f"effective_max_assistant_turns: {effective_max_assistant_turns}, "
+            f"effective_max_user_turns: {effective_max_user_turns}"
+        )
         local_instance_id = instance_id
         step_length_list = []   
         cost_time_list = []
@@ -243,6 +308,7 @@ class ToolAgentLoop_2(AgentLoopBase):
             assistant_turns += 1
 
             # parse tool calls before limit checks so overturn reflects the latest assistant turn
+            #FIXME:如果是在<think></think>中的tool_call不应该被解析
             _, tool_calls = await self.tool_parser.extract_tool_calls(response_ids)
             overturn = bool(tool_calls)
 
@@ -253,24 +319,24 @@ class ToolAgentLoop_2(AgentLoopBase):
                 break
             #FIXME:通过最后一个token是否为eos来判断是否正常输出这个turn
             # no tool calls means the assistant turn finishes normally (final answer / stop)
-            #FIXME:需要用hermes_prog来判断是否正常输出这个turn(否则存在部分tool_calls但是被截断的情况)
             if not tool_calls:
                 step_complete_list.append(True)
                 if response_ids[-1] == self.tokenizer.eos_token_id:
                     stop_reason = "answer_normally"
                 else:
                     stop_reason = "trunctated_step"
+                    #FIXME:事实上tool_calls不为空不代表没有trunctated_step,因为extract_tool_calls不需要考虑truncated_step的情况
                 break
 
             # reach max assistant turns
-            if self.max_assistant_turns and assistant_turns >= self.max_assistant_turns:
+            if effective_max_assistant_turns and assistant_turns >= effective_max_assistant_turns:
                 # Hit assistant-turn cap while still requiring a tool call in this step.
                 step_complete_list.append(False)
                 stop_reason = "assistant_turn_limit"
                 break
 
             # reach max user turns
-            if self.max_user_turns and user_turns >= self.max_user_turns:
+            if effective_max_user_turns and user_turns >= effective_max_user_turns:
                 # Hit user-turn cap before executing the pending tool call.
                 step_complete_list.append(False)
                 stop_reason = "user_turn_limit"
@@ -343,7 +409,11 @@ class ToolAgentLoop_2(AgentLoopBase):
         logger.error(
             f"instance_id finished: {local_instance_id}, response_length: {len(response_mask)}, "
             f"assistant_turns: {assistant_turns}, stop_reason: {stop_reason}, "
-            f"overturn: {overturn}"
+            f"overturn: {overturn}, "
+            f"progressive_turns_enabled: {self.progressive_turns_enabled}, "
+            f"global_step: {global_step}, "
+            f"effective_max_assistant_turns: {effective_max_assistant_turns}, "
+            f"effective_max_user_turns: {effective_max_user_turns}, "
             f"overlong_mask_applied: {overlong_mask_applied}, has_void_turn: {has_void_turn}, "
             f"step_complete_list: {step_complete_list}, step_length_list: {step_length_list}, "
             f"cost_time_list: {cost_time_list}, total_cost_time: {time.time() - t1}"

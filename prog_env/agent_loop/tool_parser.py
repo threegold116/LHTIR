@@ -104,3 +104,64 @@ class HermesToolParser(ToolParser):
         content = self.tool_call_regex.sub("", text)
 
         return content, function_calls
+    
+#--------THREEGOLDCHANGE--------#
+'''
+1.新增hermes_prog工具解析器
+相比于hermes工具解析器,hermes_prog工具解析器
+- 只解析</think>之后的<tool_call>...</tool_call>
+- 要求当前assistant step以tokenizer的eos_token结束,避免截断时误解析工具调用
+'''
+@ToolParser.register("hermes_prog")
+class HermesToolParser_Prog(ToolParser):
+    """Adapted from https://github.com/vllm-project/vllm/blob/v0.9.1/vllm/entrypoints/openai/tool_parsers/hermes_tool_parser.py"""
+
+    def __init__(self, tokenizer) -> None:
+        super().__init__(tokenizer)
+
+        self.tool_call_start_token: str = "<tool_call>"
+        self.tool_call_end_token: str = "</tool_call>"
+        self.tool_call_regex = re.compile(r"<tool_call>(.*?)</tool_call>", re.DOTALL)
+        #--------THREEGOLDCHANGE--------#
+        '''
+        1.新增think_token:<think>
+        '''
+        self.think_start_token: str = "<think>"
+        self.think_end_token: str = "</think>"
+        self.think_mode = True
+
+        #--------THREEGOLDCHANGE--------#
+    @rollout_trace_op
+    async def extract_tool_calls(self, responses_ids: list[int]) -> tuple[str, list[FunctionCall]]:
+        loop = asyncio.get_running_loop()
+        text = await loop.run_in_executor(None, self.tokenizer.decode, responses_ids)
+        if self.tool_call_start_token not in text or self.tool_call_end_token not in text:
+            return text, []
+        #--------THREEGOLDCHANGE--------#
+        '''
+        1.如果存在<think></think>，则应该解析</think>后的文本
+        2.如果存在<think>则应该存在</think>
+        3.应该是eos_token结尾
+        '''
+        if not text.rstrip().endswith(self.tokenizer.eos_token):#FIXME:暂时假设eos_token是结尾的token
+            return text, []
+        if self.think_start_token in text or self.think_mode:
+            if self.think_end_token not in text:
+                return text, []
+            text = text.split(self.think_end_token)[-1]
+        
+        #--------THREEGOLDCHANGE--------#
+        matches = self.tool_call_regex.findall(text)
+        function_calls = []
+        for match in matches:
+            try:
+                function_call = json.loads(match)
+                name, arguments = function_call["name"], function_call["arguments"]
+                function_calls.append(FunctionCall(name=name, arguments=json.dumps(arguments, ensure_ascii=False)))
+            except Exception as e:
+                logger.error(f"Failed to decode tool call: {e}")
+
+        # remaing text exclude tool call tokens
+        content = self.tool_call_regex.sub("", text)
+
+        return content, function_calls

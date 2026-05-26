@@ -371,7 +371,7 @@ class AgentLoopWorker:
             '''
             4.在_run_agent_loop中增加tools/codes的传入:follow MatchTIR
             '''
-            output = await agent_loop.run(messages, sampling_params, tools, codes)
+            output = await agent_loop.run(messages, sampling_params, tools, codes, global_step=trajectory["step"])
             #--------THREEGOLDCHANGE--------#
             return output
     #--------THREEGOLDCHANGE--------#

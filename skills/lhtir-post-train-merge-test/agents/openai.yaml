@@ -1,0 +1,4 @@
+interface:
+  display_name: "LHTIR Merge Test"
+  short_description: "Merge checkpoint and run ToolHop/BFCL"
+  default_prompt: "Use $lhtir-post-train-merge-test to merge the latest completed LHTIR checkpoint and run ToolHop/BFCL with the repo scripts."

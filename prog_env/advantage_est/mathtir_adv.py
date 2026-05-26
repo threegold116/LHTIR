@@ -7,6 +7,7 @@ from verl.trainer.ppo.core_algos import register_adv_est
 import logging
 logger = logging.getLogger(__name__)
 #--------THREEGOLDCHANGE--------#
+
 @register_adv_est("mathtir")
 def compute_grpo_mathtir_outcome_advantage(
     token_level_rewards: torch.Tensor,
@@ -360,7 +361,10 @@ def compute_grpo_mathtir_fast_outcome_advantage(
         adv_turn = torch.zeros_like(disc)
         for j in range(T):
             key = f"{index[i]}-{j}"
-            adv_turn[j] = (disc[j] - step_mean[key]) / (step_std[key] + epsilon)
+            if norm_adv_by_std_in_grpo:
+                adv_turn[j] = (disc[j] - step_mean[key]) / (step_std[key] + epsilon)
+            else:
+                adv_turn[j] = disc[j] - step_mean[key]
         discounted_adv_list.append(adv_turn)
     #--------THREEGOLDCHANGE--------#
     '''
@@ -619,12 +623,15 @@ def compute_grpo_mathtir_fast_reverse_outcome_advantage(
     '''
     t3 = time.time()
     logger.error(f"step_key2score time: {t3 - t2}")
-    mode = config.get("step_adv_mode", "reverse")
+    mode = config.get("step_adv_mode", "forward")
+    #FIXME:step_adv_mode -> mode
     def make_turn_key(prompt_id, j, T, mode="reverse"):
         if mode == "reverse":
             return f"{prompt_id}-mid_rev{T - 1 - j}"
         if mode == "forward":
             return f"{prompt_id}-mid_fwd{j}"
+        if mode == "group":
+            return f"{prompt_id}"
         #否则就是hybird:first和final保持原样
         # if T == 1:
         #     return f"{prompt_id}-single"
@@ -713,7 +720,7 @@ def compute_grpo_mathtir_fast_reverse_outcome_advantage(
     print_count = 10
     for key in step_key2score:
         num2count[len(step_key2score[key])] += 1
-        if len(step_key2score[key]) <= 1 and print_count > 0:
+        if len(stepmathtir_fast_reverse_key2score[key]) <= 1 and print_count > 0:
             logger.error(f"step_key2score: {key}, {step_key2score[key]}")
             print_count -= 1
     logger.error(f"step group num2count: {sorted(num2count.items(),key=lambda x: x[1])}")

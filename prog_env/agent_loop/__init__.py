@@ -20,7 +20,8 @@
 from .agent_loop import AgentLoopBase, AgentLoopManager
 from .tool_agent_loop import ToolAgentLoop
 from .tool_agent_loop_2 import ToolAgentLoop_2
+from .tool_agent_loop_3 import ToolAgentLoop_3
 
-_ = [ToolAgentLoop, ToolAgentLoop_2]
+_ = [ToolAgentLoop, ToolAgentLoop_2, ToolAgentLoop_3]
 
 __all__ = ["AgentLoopBase", "AgentLoopManager"]
