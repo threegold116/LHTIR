@@ -234,6 +234,7 @@ def compute_grpo_mathtir_fast_outcome_advantage(
     '''
     import time
     t0 = time.time()
+    config = kwargs.get("config", {})
     logger.error(f"input shape: {token_level_rewards.shape}")
     #--------THREEGOLDCHANGE--------#
     with torch.no_grad():
@@ -375,10 +376,16 @@ def compute_grpo_mathtir_fast_outcome_advantage(
     #--------THREEGOLDCHANGE--------#
     final_scores = torch.zeros(bsz, seq_len)
 
+    #--------THREEGOLDCHANGE--------#
+    '''
+    新增:计算fused_adv
+    '''
+    alpha = config.get("alpha", 0.5)
+    #--------THREEGOLDCHANGE--------#
     for i in range(bsz):
         turns = turns_list[i]
         step_adv = discounted_adv_list[i]
-        fused_adv = (group_adv[i] + step_adv) / 2 
+        fused_adv = alpha * group_adv[i] + (1 - alpha) * step_adv
 
         for j, (s, e) in enumerate(turns):
             final_scores[i, s:e+1] = fused_adv[j]
@@ -720,7 +727,7 @@ def compute_grpo_mathtir_fast_reverse_outcome_advantage(
     print_count = 10
     for key in step_key2score:
         num2count[len(step_key2score[key])] += 1
-        if len(stepmathtir_fast_reverse_key2score[key]) <= 1 and print_count > 0:
+        if len(step_key2score[key]) <= 1 and print_count > 0:
             logger.error(f"step_key2score: {key}, {step_key2score[key]}")
             print_count -= 1
     logger.error(f"step group num2count: {sorted(num2count.items(),key=lambda x: x[1])}")
